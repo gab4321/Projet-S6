@@ -21,6 +21,8 @@
 // Put your preprocessor definitions here
 #define PH_ERROR_CODE 0xFFFF
 
+//#define MESSAGE_ALERTE_HAUT "ACPDNERW" // a changer eventuellement !!!
+
 /*- Types ------------------------------------------------------------------*/
 // Put your type definitions here
 
@@ -33,6 +35,9 @@ void LED_setup(void);
 void Timer_Init(void);
 void printf_func(char* buf);
 void ledAlerte(uint8_t niveau);
+void ledPH(float valeurPh);
+void envoieNiveauAlerte(uint8_t niveau);
+char* receptionWireless();
 
 char Lis_UART(void);
 void Ecris_UART(char data);
@@ -42,6 +47,7 @@ void init_UART(void);
 void set_couleur(int rouge, int bleu, int vert);
 float lecture_ADC(void);
 float conv_PH(float adc_value);
+
 
 /*- Variables --------------------------------------------------------------*/
 // Put your variables here
@@ -76,14 +82,29 @@ int ADC_value_high = 0;
 //////////////////////////////////////////////////
 // VRAI VARIABLES
 
+static const char MessageAlerteHaut = "ABCDEFGH"; // A IMPLÉMENTER AVEC DES ENUMS ???
+static const char MessageAlerteBas = "BBBNNNNN"; // A IMPLEMENTER AVEC DES ENUMS ???
+
 uint8_t niveauAlerte = 1;
 volatile int compteurMesurePh = 0;
+volatile int compteurAttenteConf = 0;
+volatile int compteurAttenteEmission = 0;
 volatile uint8_t intervalMesurePh = 2; // secondes
+volatile uint8_t intervalAttenteAlerte = 30; // secondes
+volatile uint8_t intervalAttenteEmission = 30; // secondes
 volatile bool flagPh = false;
 volatile bool flag_ADC = false;
+volatile bool flagCancelAlerte = false;
+volatile bool flagAttenteAlerte = false;
+volatile bool flagAttenteEmission = false;
+volatile bool flagEmissionFinie = false;
+bool mesureStanby = false;
 float valeurADC = 0;
-float valeurPh = 0;
+float valeurPh = 7.0; // initialement PH neutre
 uint8_t seuilPh = 4; // seuil du niveau 
+uint8_t messageWireless[128];
+uint8_t NbAlertesEnvoyee = 0;
+char* messageRecu = '\0'; // message reception
 
 ////////////////////////////////////////////////////////////////////////////////
 // INTERRUPT SERVICE ROUTINE
@@ -104,17 +125,40 @@ ISR(TIMER1_COMPA_vect) {
 	
 	// tests leds RGB
 	//set_couleur(valeur_rouge, valeur_bleu, valeur_vert);
-	
 }
 
 // ISR du timer 3: survient a chaque seconde -> pour timer les evenements de transmission & detection des sondes
 ISR(TIMER3_COMPA_vect) {
 	
-	// 
+	// interval de mesure du pH
 	if(compteurMesurePh++ > intervalMesurePh)
 	{
 		compteurMesurePh = 0;
 		flagPh = true;
+	}
+	
+	// compteur pour lattente lors de lenvoie dun niveau dalerte
+	if(compteurAttenteConf++ > intervalAttenteAlerte && flagAttenteAlerte)
+	{
+		compteurAttenteConf = 0;
+		flagCancelAlerte = true;
+	}
+	else if(!flagAttenteAlerte)
+	{
+		compteurAttenteConf = 0;
+		flagCancelAlerte = false; 
+	}
+	
+	// compteur pour lemission dultrason
+	if(compteurAttenteEmission++ > intervalAttenteEmission && flagAttenteEmission)
+	{
+		compteurAttenteEmission = 0;
+		flagEmissionFinie = true;
+	}
+	else if(!flagAttenteEmission)
+	{
+		compteurAttenteEmission = 0;
+		flagEmissionFinie = false;
 	}
 }
 
@@ -131,109 +175,139 @@ ISR(ADC_vect)
 
 static void APP_TaskHandler(void)
 {
-	// update les leds de niveau dalerte
+	// Update les leds de niveau dalerte
 	ledAlerte(niveauAlerte);
 	
-	// mesure du PH en boucle
-	////////////////////////////////////////////////////////////////////////////////
-	if(flagPh)
-	{
-		flagPh = false;
-		start_ADC();
-	}
-
-	if(flag_ADC)
-	{
-		flag_ADC = false;
-		
-		valeurADC = lecture_ADC();
-		
-		
-		
-		valeurPh = conv_PH(valeurADC);
-		
-		if (valeurPh == PH_ERROR_CODE)
+	// Update les leds de niveau de pH
+	ledPH(valeurPh);
+	
+	if(!mesureStanby)
+	{	
+		// Mesure du PH en boucle
+		////////////////////////////////////////////////////////////////////////////////
+		if(flagPh)
 		{
-			printf_func("ATTENTION: Valeur du pH non valide");		
-		}		
-	}
-	////////////////////////////////////////////////////////////////////////////////
-	
-	// verifie le niveau de PH
-	////////////////////////////////////////////////////////////////////////////////
-	if(valeurPh < seuilPh)
-	{
-		niveauAlerte = 2; // 
-		
-	}
-	
-	
-	
-	
-	
-	////////////////////////////////////////////////////////////////////////////////
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	/*
-  char receivedUart = 0;
-
-  receivedUart = Lis_UART();  
-  if(receivedUart) //est-ce qu'un caractere a été recu par l'UART?
-  {
-	  Ecris_UART(receivedUart);	//envoie l'echo du caractere recu par l'UART
-
-	  if(receivedUart == 'a')	//est-ce 
-	  .que le caractere recu est 'a'? 
-		{
-		uint8_t demonstration_string[128] = "123456789A"; //data packet bidon
-		Ecris_Wireless(demonstration_string, 10); //envoie le data packet; nombre d'éléments utiles du paquet à envoyer
+			flagPh = false; // start ADC conv
+			start_ADC();
 		}
-  }
-  */
-  
-  /*
-  if(receivedWireless == 1) //est-ce qu'un paquet a été recu sur le wireless? 
-  {
-	char buf[196];
 
-	//si quelqu'un a une méthode plus propre / mieux intégrée à proposer pour faire des "printf" avec notre fonction Ecris_UART, je veux bien l'entendre! 
-	sprintf( buf, "\n\rnew trame! size: %d, RSSI: %ddBm\n\r", ind.size, ind.rssi );
-	char *ptr = buf;
-	while( *ptr != (char)0 )
-		Ecris_UART( *ptr++ );
+		if(flag_ADC) // mesure ADC prete
+		{
+			flag_ADC = false;
 		
-	sprintf( buf, "contenu: ");
-	ptr = buf;
-	while( *ptr != (char)0 )
-		Ecris_UART( *ptr++ );
-
-	ptr = ind.data;
-	char i = 0;
-	while( i < ind.size )
-	{
-		Ecris_UART( *ptr++ );
-		i++;
-	}
-
-	sprintf( buf, "\n\r");
-	ptr = buf;
-	while( *ptr != (char)0 )
-		Ecris_UART( *ptr++ );
+			valeurADC = lecture_ADC();
+		
+			valeurPh = conv_PH(valeurADC); 
+		
+			if (valeurPh == PH_ERROR_CODE)
+			{
+				printf_func("ATTENTION: Valeur du pH non valide");	 // debug	
+			}		
+		}
+		////////////////////////////////////////////////////////////////////////////////
 	
-	receivedWireless = 0; 
-  }
-  */
+		// verifie le niveau de PH
+		////////////////////////////////////////////////////////////////////////////////
+		if(valeurPh < seuilPh)
+		{
+			printf_func("detection pH trop faible de la sonde"); // debug
+			niveauAlerte = 2; // les leds changent détat	
+			
+			envoieNiveauAlerte(niveauAlerte); // indique a lautre sonde un niveau dalerte
+			
+			mesureStanby = true; // arete les mesures
+			flagAttenteAlerte = true; // active le compteur dattente de conf de lautre sonde
+		}
+		else
+		{
+			// la sonde nest pas en niveau dalerte alors on reset la suite dalerte envoyée a la sonde 2
+			NbAlertesEnvoyee = 0; 
+		}
+		////////////////////////////////////////////////////////////////////////////////
+	}	
+	
+	// Time out de la reception de la confirmation dalerte
+	////////////////////////////////////////////////////////////////////////////////
+	if(flagCancelAlerte) // compteur de 30 sec dattente ecoulé ...
+	{
+		printf_func("alerte annulee: 30 sec ecoule"); // debug
+		flagAttenteAlerte = false; // on arrete le compteur dattente
+		mesureStanby = false; // on peut recommencer les mesures de pH
+		niveauAlerte = 1; // le niveau dalerte retombe a la normal	
+		
+		// compteur qui verifie si ça fait plusieurs
+	}
+	////////////////////////////////////////////////////////////////////////////////
+	
+	// Verifie si on reçoit une trame sur wireless
+	////////////////////////////////////////////////////////////////////////////////
+	if(receivedWireless == 1)
+	{			
+		messageRecu = receptionWireless(); // lit le message recu et fait gestion derreur
+	}
+	////////////////////////////////////////////////////////////////////////////////
+	
+	// si le message recu sur wireless confirme la presence dalgues bleues
+	////////////////////////////////////////////////////////////////////////////////
+	if(messageRecu == MessageAlerteHaut && flagAttenteAlerte) // si le message est un niveau dalerte haut
+	{
+		flagAttenteAlerte = false; // on arrete le compteur dattente	
+		
+		niveauAlerte = 3; // le niveau dalerte est a tres haut: emission dultrason
+		flagAttenteEmission = true;
+	}
+	////////////////////////////////////////////////////////////////////////////////
+	
+	// si le message recu sur wireless ne confirme pas la presence dalgues bleues
+	////////////////////////////////////////////////////////////////////////////////
+	if(messageRecu == MessageAlerteBas && flagAttenteAlerte) // si le message est un niveau dalerte haut
+	{
+		if(NbAlertesEnvoyee < 5) // si ca ne fait pas 5 alarmes que la premiere sonde fait
+		{
+				flagAttenteAlerte = false; // on arrete le compteur dattente
+						
+				niveauAlerte = 1; // le niveau dalerte retourne a bas pour linstant
+				flagAttenteEmission = false;
+				
+				mesureStanby = false; // on peut recommencer les mesures de pH car on nemet pas tout de suite des ultrasons	
+		}
+		if(NbAlertesEnvoyee >= 5)  // si ca fait 5 essaie que la premiere sonde fait elle ignore la confirmation de lautre et emet ultrasons
+		{
+				NbAlertesEnvoyee = 0; // on reset la sequence de non confirmation
+				flagAttenteAlerte = false; // on arrete le compteur dattente
+							
+				niveauAlerte = 3; // niveau alerte 3: la sonde emet ultrasons
+				flagAttenteEmission = true;	
+						
+		}
+	}
+	////////////////////////////////////////////////////////////////////////////////
+	
+	// si on a terminé la periode demission dultrasons
+	////////////////////////////////////////////////////////////////////////////////
+	if(flagEmissionFinie)
+	{
+		flagAttenteEmission = false; // lemission est terminé on arrete le compteur
+		
+		niveauAlerte = 1; // les algues sont peut etre eleminée lemission dultrason arrete
+		
+		mesureStanby = false; // on peut recommencer les mesures de pH
+	}
+	////////////////////////////////////////////////////////////////////////////////
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -256,10 +330,93 @@ int main(void)
 // FONCTIONS
 ////////////////////////////////////////////////////////////////////////////////
 
+// analyse le message recu wireless et sort le tableau recu en eliminant lentete / gestion derreurs
+char* receptionWireless()
+{
+	//////////
+	//////////
+	//////////
+	// A FAIRE
+	//////////
+	//////////
+	//////////
+	
+	// pour debug...
+	////////////////////////////////////////////////////////////////////////////////
+	char buf[196];
+	char *ptr = buf;
+		
+	sprintf( buf, "\n\rnew trame! size: %d, RSSI: %ddBm\n\r", ind.size, ind.rssi );
+	printf_func(buf);
+		
+	printf_func("contenu: ");
+
+	ptr = ind.data;
+	char i = 0;
+	while( i < ind.size )
+	{
+		Ecris_UART( *ptr++ );
+		i++;
+	}
+
+	sprintf( buf, "\n\r");
+	ptr = buf;
+	while( *ptr != (char)0 )
+	Ecris_UART( *ptr++ );
+		
+	receivedWireless = 0;
+	////////////////////////////////////////////////////////////////////////////////
+}
+
+// envoie les messages par communication sans fils pour les niveau dalerte
+bool envoieNiveauAlerte(uint8_t niveau)
+{
+	//////////
+	//////////
+	//////////
+	// A FAIRE
+	//////////
+	//////////
+	//////////
+	
+	switch(niveau){
+	
+		case 1:
+			// envoie message aucune alerte (niveau de base)
+			break;
+		
+		case 2:
+			// envoie message premiere detection (attente de confirmation)
+			break;
+		
+		default:
+			// envoie message alerte (emission dultrasons)
+			break;
+	}
+}
+
 // gere les leds du niveau dalerte
 void ledAlerte(uint8_t niveau)
 {
+	//////////
+	//////////
+	//////////
 	// A FAIRE
+	//////////
+	//////////
+	//////////
+}
+
+// gere les leds du niveau de pH
+void ledPH(float valeurPh)
+{
+	//////////
+	//////////
+	//////////
+	// A FAIRE
+	//////////
+	//////////
+	//////////
 }
 
 //FONCTION D'INITIALISATION
@@ -369,18 +526,6 @@ void LED_setup(void)
 	PORTB = 0xFF; //LEDs a off
 }
 
-/*
-// NE SAIS PAS CE QUE CA FAIT: A VOIR ***
-void wdt_disable(void) // cest utile ??
-{
-	// Disable watchdog timer
-	asm("wdr");
-	MCUSR = 0;
-	WDTCSR |= (1 << WDCE) | (1 << WDE);
-	WDTCSR = 0x00;
-}
-*/
-
 // FONCTION QUI EFFECTUE LA LECTURE DE LADC
 float lecture_ADC(void)
 {
@@ -444,6 +589,18 @@ void start_ADC()
 {
 	ADCSRA |= 0b01000000;
 }
+
+/*
+// NE SAIS PAS CE QUE CA FAIT: A VOIR ***
+void wdt_disable(void) // cest utile ??
+{
+	// Disable watchdog timer
+	asm("wdr");
+	MCUSR = 0;
+	WDTCSR |= (1 << WDCE) | (1 << WDE);
+	WDTCSR = 0x00;
+}
+*/
 
 
 
