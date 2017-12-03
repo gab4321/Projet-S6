@@ -837,11 +837,11 @@ END GROUP
  *(.debug_frame)
  .debug_frame   0x00000000      0x278 Blinky_LED.o
 
-.debug_str      0x00000000      0xb62
+.debug_str      0x00000000      0xb48
  *(.debug_str)
  .debug_str     0x00000000      0x7f7 C:/Program Files (x86)/Atmel/Studio/7.0/Packs/atmel/ATmega_DFP/1.2.132/gcc/dev/atmega256rfr2/avr6/crtatmega256rfr2.o
- .debug_str     0x000007f7      0x36b Blinky_LED.o
-                                0x3c0 (size before relaxing)
+ .debug_str     0x000007f7      0x351 Blinky_LED.o
+                                0x3a6 (size before relaxing)
 
 .debug_loc      0x00000000      0x7aa
  *(.debug_loc)

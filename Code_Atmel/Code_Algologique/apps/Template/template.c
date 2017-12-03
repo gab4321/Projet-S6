@@ -96,9 +96,6 @@ enum EtatAlerteGlobal
 	EMISSION
 };
 
-
-//receptState test = SUCCESS;
-
 volatile int compteurMesurePh = 0;
 volatile int compteurAttenteConf = 0;
 volatile int compteurAttenteEmission = 0;
@@ -107,7 +104,7 @@ volatile int compteurAttenteAck2 = 0;
 volatile int compteur_color = 0;
 volatile int compteurPoll = 0;
 
-volatile uint8_t intervalMesurePh = 2; // secondes
+volatile int intervalMesurePh = 2; // secondes
 volatile uint8_t intervalAttenteAlerte = 30; // secondes
 volatile uint8_t intervalAttenteEmission = 30; // secondes
 
@@ -129,6 +126,7 @@ volatile int TimeOutComm = 5; // secondes
 EtatAlerte niveauAlerte1 = INDETERMINE;
 EtatAlerte tempNiveauAlerte2 = INDETERMINE;
 EtatAlerte niveauAlerte2 = INDETERMINE;
+EtatAlerteGlobal etatAlerteGlobal = ATTENTE;
 AckType receptAckType = ERROR_ACK;
 
 bool mesureStanby = false;
@@ -163,7 +161,7 @@ ISR(TIMER1_COMPA_vect) {
 ISR(TIMER3_COMPA_vect) {
 	
 	// compteur pour interval de mesure du pH
-	if(compteurMesurePh++ > intervalMesurePh)
+	if(compteurMesurePh++ >= intervalMesurePh)
 	{
 		compteurMesurePh = 0;
 		flagPh = true;
@@ -219,7 +217,7 @@ ISR(ADC_vect)
 static void APP_TaskHandler(void)
 {
 	// Update les leds de niveau dalerte
-	ledAlerte(1); // A FAIRE: METTRE BONNE VARIABLE
+	ledAlerte(etatAlerteGlobal); // A FAIRE: METTRE BONNE VARIABLE
 	
 	// Update les leds de niveau de pH
 	ledPH(valeurPh);
@@ -240,7 +238,9 @@ static void APP_TaskHandler(void)
 		valeurADC = lecture_ADC();
 		
 		valeurPh = conv_PH(valeurADC); 
-	
+		
+		Ecris_UART("\nTension ADC: %f V\n",valeurADC);  // debug
+		Ecris_UART("\nValeur pH: %f \n",valeurPh);		// debug
 		
 		// verifie le niveau de PH
 		if(valeurPh == PH_ERROR_CODE)
@@ -249,22 +249,24 @@ static void APP_TaskHandler(void)
 		}
 		else if(valeurPh < seuilPh)
 		{
-			Ecris_UART("\ndetection pH trop faible: Alerte HAUT\n"); // debug
+			//Ecris_UART("\ndetection pH trop faible: Alerte HAUT\n"); // debug
 			
 			if(niveauAlerte1 == BAS) // si changement detat on envoie un poll a lautre sonde
 			{
 				flagPoll = true;
+				Ecris_UART("\nLe niveau dalerte sonde 1 passe de bas a haut\n"); // debug
 			}
 			
 			niveauAlerte1 = HAUT; 
 		}	
 		else if(valeurPh > seuilPh)
 		{
-			Ecris_UART("\ndetection pH OK: Alerte BAS\n"); // debug		
+			//Ecris_UART("\ndetection pH OK: Alerte BAS\n"); // debug		
 			
 			if(niveauAlerte1 == HAUT) // si changement detat on envoie un poll a lautre sonde
 			{
 				flagPoll = true;
+				Ecris_UART("\nLe niveau dalerte sonde 1 passe de haut a bas\n"); // debug
 			}
 			
 			niveauAlerte1 = BAS; 		
@@ -300,9 +302,14 @@ static void APP_TaskHandler(void)
 		
 		niveauAlerte2 = INDETERMINE; // on ne sais pas le niveau dalerte de la sonde 2
 		
+		Ecris_UART("\nLa sonde 1 na pas recu dack de sonde 2 dans le delai prescrit\n"); // debug
+		
 		if(compteurPerteConnexion++ >= maxPerteConnexion) // si ca trop dessai et pas de nouvelle de la sonde 2
+		{
 			perteConnexion = true;
-			
+			compteurPerteConnexion = 0;
+			Ecris_UART("\nTrop dessais de comm on eu lieu on rejette letat de la sonde 2 dans la prise de decision pour linstant\n"); // debug		
+		}			
 	}
 	
 	// Si la sonde 2 na pas repondu dans linterval de timeout pour le ack2
@@ -387,6 +394,23 @@ static void APP_TaskHandler(void)
 	// ICI: METTRE UNE FONCTION QUI COMPUTE SI ON EMET DES ULTRASONS OU NON
 	// SELON LES NIVEAU DALERTES COMBINÉS 
 	////////////////////////////////////////////////////////////////////////////////
+	//perteConnexion
+	//niveauAlerte2
+	//niveauAlerte1
+	
+	////////////////////////////////////////////////////////////////////////////////
+	if(perteConnexion && niveauAlerte1 == HAUT)
+		etatAlerteGlobal = EMISSION;
+		
+	if(!perteConnexion && niveauAlerte1 == HAUT && (niveauAlerte2 == INDETERMINE || niveauAlerte2 == ERROR_ALERTE))
+		etatAlerteGlobal = AVERTISSEMENT;
+		
+	if(!perteConnexion && niveauAlerte1 == HAUT && niveauAlerte2 == HAUT)
+		etatAlerteGlobal = HAUT;
+		
+	if(!perteConnexion && niveauAlerte1 == HAUT && niveauAlerte2 == HAUT)
+		etatAlerteGlobal = HAUT;
+	////////////////////////////////////////////////////////////////////////////////	
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -408,7 +432,6 @@ int main(void)
 ////////////////////////////////////////////////////////////////////////////////
 // FONCTIONS
 ////////////////////////////////////////////////////////////////////////////////
-
 
 // analyse le message recu wireless et sort le tableau recu en eliminant lentete / gestion derreurs
 bool recoieMessage(EtatAlerte message, AckType acktype, bool CRC_confirm)
@@ -442,7 +465,7 @@ void ledAlerte(EtatAlerteGlobal etatalerteglobal)
 	//////////
 	//////////
 	//////////
-	// A FAIRE
+	// A MODIFIER
 	//////////
 	//////////
 	//////////
@@ -454,10 +477,30 @@ void ledPH(float valeurPh)
 	//////////
 	//////////
 	//////////
-	// A FAIRE
+	// A MODIFIER
 	//////////
 	//////////
 	//////////
+	
+	if(valeurPh >)
+	// pour le rouge
+	if((compteur_color >= (100 - rouge)))
+	PORTB &= 0xBF; // niveau low = leds alumée
+	else if(compteur_color < (100 - rouge))
+	PORTB |= 0x40; // niveau high = leds éteinte
+		
+	// pour le bleu
+	if((compteur_color >= (100 - bleu)))
+	PORTB &= 0xFD; // niveau low = leds alumée
+	else if(compteur_color < (100 - bleu))
+	PORTB |= 0x02; // niveau high = leds éteinte
+
+	// pour le vert
+	if((compteur_color >= (100 - vert)))
+	PORTB &= 0xDF; // niveau low = leds alumée
+	else if(compteur_color < (100 - vert))
+	PORTB |= 0x20; // niveau high = leds éteinte
+	
 }
 
 //FONCTION D'INITIALISATION
@@ -468,13 +511,15 @@ void SYS_Init(void)
 	receivedWireless = 0;
 	wdt_disable(); 
 	init_UART();
-	PHY_Init(); //initialise le wireless
-	PHY_SetRxState(1); //TRX_CMD_RX_ON
+	//PHY_Init(); //initialise le wireless
+	//PHY_SetRxState(1); //TRX_CMD_RX_ON
 	
 	//wdt_disable();
 	LED_setup();
 	ADC_setup();
-	Timer_Init();	
+	Timer_Init();
+	
+	sei();	
 }
 
 // FONCTION DE CONVERSION DU VOLTAGE EN PH
