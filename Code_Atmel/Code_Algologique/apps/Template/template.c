@@ -34,19 +34,23 @@ void ADC_setup(void);
 void LED_setup(void);
 void Timer_Init(void);
 void printf_func(char* buf);
-void ledAlerte(uint8_t niveau);
+
+void ledAlerte(uint8_t etatAlerte);
 void ledPH(float valeurPh);
-void envoieNiveauAlerte(uint8_t niveau);
-char* receptionWireless();
+
+void set_couleur(int rouge, int bleu, int vert);
+float lecture_ADC(void);
+float conv_PH(float adc_value);
+
+void envoieMessage(uint8_t message, uint8_t acktype);
+
+uint8_t recoieMessage(uint8_t message, uint8_t acktype);
 
 char Lis_UART(void);
 void Ecris_UART(char data);
 void init_UART(void);
 //void wdt_disable(void);
 
-void set_couleur(int rouge, int bleu, int vert);
-float lecture_ADC(void);
-float conv_PH(float adc_value);
 
 
 /*- Variables --------------------------------------------------------------*/
@@ -56,55 +60,77 @@ uint8_t receivedWireless;	//cette variable deviendra 1 lorsqu'un nouveau paquet 
 
 PHY_DataInd_t ind; //cet objet contiendra les informations concernant le dernier paquet qui vient de rentrer
 
-//////////////////////////////////////////////////
-// VARIABLES DE TEST
-volatile int compteur_color = 0;
-volatile long int compteur_test = 0;
-volatile int valeur_rouge = 0;
-volatile int valeur_vert = 0;
-volatile int valeur_bleu = 0;
-volatile int flag_test = 0;
-volatile int flag_test2 = 0;
-volatile int testt = 0;
-volatile int compteur_test2 = 0;
+// enum 
+enum // A FAIRE: mettre dautres valeurs a lenum ?
+{
+	// niveaux dalerte
+	BAS,
+	HAUT,
+	INDETERMINE,
+	
+	// etat de communication
+	IDLE,
+	ATTENTE_ACK1,
+	ATTENTE_ACK2,
+	
+	// type dacknowledge
+	POLL,
+	ACK1,
+	ACK2
+};
 
-int ii,jj,kk;
-float voltage_adc = 0;
-float PH_value = 0;
+// enum pour reussite ou echec de la reception
+enum receptState
+{
+	SUCCESS,
+	FAILED
+};
 
-unsigned int test1 = 0;
-unsigned int test2 = 0;
+receptState test = SUCCESS;
 
-unsigned int ADC_value = 0;
-int ADC_value_low = 0;
-int ADC_value_high = 0;
-
-//////////////////////////////////////////////////
-// VRAI VARIABLES
-
-static const char MessageAlerteHaut = "ABCDEFGH"; // A IMPLÉMENTER AVEC DES ENUMS ???
-static const char MessageAlerteBas = "BBBNNNNN"; // A IMPLEMENTER AVEC DES ENUMS ???
-
-uint8_t niveauAlerte = 1;
 volatile int compteurMesurePh = 0;
 volatile int compteurAttenteConf = 0;
 volatile int compteurAttenteEmission = 0;
+volatile int compteurAttenteAck1 = 0;
+volatile int compteurAttenteAck2 = 0;
+volatile int compteur_color = 0;
+volatile int compteurPoll = 0;
+
 volatile uint8_t intervalMesurePh = 2; // secondes
 volatile uint8_t intervalAttenteAlerte = 30; // secondes
 volatile uint8_t intervalAttenteEmission = 30; // secondes
+
 volatile bool flagPh = false;
 volatile bool flag_ADC = false;
 volatile bool flagCancelAlerte = false;
 volatile bool flagAttenteAlerte = false;
 volatile bool flagAttenteEmission = false;
 volatile bool flagEmissionFinie = false;
+volatile bool flagPoll = false;
+volatile bool flagAttenteAck1 = false;
+volatile bool flagAttenteAck2 = false;
+volatile bool flagTimeOutAck1 = false;
+volatile bool flagTimeOutAck2 = false;
+
+volatile int intervalPoll = 20; // secondes
+volatile int TimeOutComm = 5; // secondes
+
+uint8_t niveauAlerte1 = INDETERMINE;
+uint8_t tempNiveauAlerte2 = INDETERMINE;
+uint8_t niveauAlerte2 = INDETERMINE;
+
+uint8_t etatEchangeEnvoie = IDLE;
+
+uint8_t etatEchangeRecept = IDLE;
+
+uint8_t receptAckType = INDETERMINE;
+
 bool mesureStanby = false;
 float valeurADC = 0;
 float valeurPh = 7.0; // initialement PH neutre
 uint8_t seuilPh = 4; // seuil du niveau 
 uint8_t messageWireless[128];
 uint8_t NbAlertesEnvoyee = 0;
-char* messageRecu = '\0'; // message reception
 
 ////////////////////////////////////////////////////////////////////////////////
 // INTERRUPT SERVICE ROUTINE
@@ -113,15 +139,7 @@ char* messageRecu = '\0'; // message reception
 // ISR DU TIMER 1
 ISR(TIMER1_COMPA_vect) {
 	
-	compteur_color++;
-	compteur_test++;
-	
-	// start ADC conversion each X seconds
-	if(compteur_test >= 100000)
-	{
-		compteur_test = 0;
-		flag_test = 1;
-	}
+	compteur_color++; // test pour fonction de leds...
 	
 	// tests leds RGB
 	//set_couleur(valeur_rouge, valeur_bleu, valeur_vert);
@@ -130,35 +148,46 @@ ISR(TIMER1_COMPA_vect) {
 // ISR du timer 3: survient a chaque seconde -> pour timer les evenements de transmission & detection des sondes
 ISR(TIMER3_COMPA_vect) {
 	
-	// interval de mesure du pH
+	// compteur pour interval de mesure du pH
 	if(compteurMesurePh++ > intervalMesurePh)
 	{
 		compteurMesurePh = 0;
 		flagPh = true;
 	}
 	
-	// compteur pour lattente lors de lenvoie dun niveau dalerte
-	if(compteurAttenteConf++ > intervalAttenteAlerte && flagAttenteAlerte)
+	/*
+	// compteur pour lupdate / poll a la deuxieme sonde
+	if(compteurPoll++ > intervalPoll)
 	{
-		compteurAttenteConf = 0;
-		flagCancelAlerte = true;
+		compteurPoll = 0;
+		flagPoll = true;
 	}
-	else if(!flagAttenteAlerte)
+	*/
+	
+	// compteur de timeout de la comm si ne recoit pas dacknowledge UN (1) dans les delai requis
+	if(compteurAttenteAck1++ > TimeOutComm && flagAttenteAck1)
 	{
-		compteurAttenteConf = 0;
-		flagCancelAlerte = false; 
+		compteurAttenteAck1 = 0;
+		flagAttenteAck1 = false; 
+		flagTimeOutAck1 = true;
+	}
+	else if(!flagAttenteAck1)
+	{
+		compteurAttenteAck1 = 0;
+		flagTimeOutAck1 = false;
 	}
 	
-	// compteur pour lemission dultrason
-	if(compteurAttenteEmission++ > intervalAttenteEmission && flagAttenteEmission)
+	// compteur de timeout de la comm si ne recoit pas dacknowledge DEUX (2) dans les delai requis
+	if(compteurAttenteAck2++ > TimeOutComm && flagAttenteAck2)
 	{
-		compteurAttenteEmission = 0;
-		flagEmissionFinie = true;
+		compteurAttenteAck2 = 0;
+		flagAttenteAck2 = false; 
+		flagTimeOutAck2 = true;
 	}
-	else if(!flagAttenteEmission)
+	else if(!flagAttenteAck2)
 	{
-		compteurAttenteEmission = 0;
-		flagEmissionFinie = false;
+		compteurAttenteAck2 = 0;
+		flagTimeOutAck2 = false;
 	}
 }
 
@@ -176,138 +205,132 @@ ISR(ADC_vect)
 static void APP_TaskHandler(void)
 {
 	// Update les leds de niveau dalerte
-	ledAlerte(niveauAlerte);
+	ledAlerte(1); // A FAIRE: METTRE BONNE VARIABLE
 	
 	// Update les leds de niveau de pH
 	ledPH(valeurPh);
 	
-	if(!mesureStanby)
-	{	
-		// Mesure du PH en boucle
-		////////////////////////////////////////////////////////////////////////////////
-		if(flagPh)
-		{
-			flagPh = false; // start ADC conv
-			start_ADC();
-		}
+	// Part la convertion dADC a chaque 30 secondes pour updater letat de la sonde
+	if(flagPh)
+	{
+		flagPh = false;
+		
+		start_ADC();
+	}
 
-		if(flag_ADC) // mesure ADC prete
-		{
-			flag_ADC = false;
+	// mesure ADC terminée: on calcul la valeur du pH et on update letat de la presente sonde
+	if(flag_ADC)
+	{
+		flag_ADC = false;
 		
-			valeurADC = lecture_ADC();
+		valeurADC = lecture_ADC();
 		
-			valeurPh = conv_PH(valeurADC); 
-		
-			if (valeurPh == PH_ERROR_CODE)
-			{
-				printf_func("ATTENTION: Valeur du pH non valide");	 // debug	
-			}		
-		}
-		////////////////////////////////////////////////////////////////////////////////
+		valeurPh = conv_PH(valeurADC); 
 	
+		
 		// verifie le niveau de PH
-		////////////////////////////////////////////////////////////////////////////////
-		if(valeurPh < seuilPh)
+		if(valeurPh == PH_ERROR_CODE)
 		{
-			printf_func("detection pH trop faible de la sonde"); // debug
-			niveauAlerte = 2; // les leds changent détat	
-			
-			envoieNiveauAlerte(niveauAlerte); // indique a lautre sonde un niveau dalerte
-			
-			mesureStanby = true; // arete les mesures
-			flagAttenteAlerte = true; // active le compteur dattente de conf de lautre sonde
+			printf_func("ATTENTION: Valeur du pH non valide");	 // debug
 		}
-		else
+		else if(valeurPh < seuilPh)
 		{
-			// la sonde nest pas en niveau dalerte alors on reset la suite dalerte envoyée a la sonde 2
-			NbAlertesEnvoyee = 0; 
+			printf_func("detection pH trop faible: Alerte HAUT"); // debug
+			
+			if(niveauAlerte1 == BAS) // si changement detat on envoie un poll a lautre sonde
+			{
+				flagPoll = true;
+			}
+			
+			niveauAlerte1 = HAUT; 
+		}	
+		else if(valeurPh > seuilPh)
+		{
+			printf_func("detection pH OK: Alerte BAS"); // debug
+			
+			if(niveauAlerte1 == HAUT) // si changement detat on envoie un poll a lautre sonde
+			{
+				flagPoll = true;
+			}
+			
+			niveauAlerte1 = BAS; 		
 		}
-		////////////////////////////////////////////////////////////////////////////////
+	}
+	
+	// Part un envoi de letat dalerte à lautre sonde ce qui est en meme temps un poll pour letat dalerte
+	// de cette deuxieme sonde
+	if(flagPoll)
+	{
+		flagPoll = false;
+		
+		envoieMessage(niveauAlerte1, POLL); // effectue le checksum + code dentete + envoie du poll
+		
+		etatEchangeEnvoie = ATTENTE_ACK1; // etat de lechange sans fil	
+		
+		flagAttenteAck1 = true; // part le compteur qui attend de ack de lautre sonde
+	}
+	
+	// Si la sonde 2 na pas repondu dans linterval de timeout pour le ack1 
+	if(flagTimeOutAck1)
+	{
+		// A TERMINER -> ajouté un reenvoie et un compteur (apres x reenvoit on cancel)
+		
+		flagTimeOutAck1 = false;
+		
+		etatEchangeEnvoie = IDLE;
+		
+		niveauAlerte2 = INDETERMINE;
+	}
+	
+	// Si la sonde 2 na pas repondu dans linterval de timeout pour le ack1
+	if(flagTimeOutAck2)
+	{
+		// A TERMINER -> ajouté un reenvoie et un compteur (apres x reenvoit on cancel)
+		
+		flagTimeOutAck2 = false;
+		
+		etatEchangeEnvoie = IDLE;
+			
+		niveauAlerte2 = INDETERMINE;	
+	}
+	
+	// si un paquet est recu sur le wireless
+	if(receivedWireless == 1)
+	{
+		receivedWireless = 0;
+		
+		if(recoieMessage(tempNiveauAlerte2, receptAckType) == 1)
+		{
+			// si le ack type est poll -> envoie letat de la sonde avec ack1 en param
+			// A FAIRE
+			
+			// si le ack type est ack1 -> update le niveau dalerte de la sonde 2 et envoie ack2 (Valide si etatEchangeEnvoie = ATTENTE_ACK1)
+			// A FAIRE
+			
+			// si le ack type est ack2 -> on arrete le compteur qui calcul le timeout avant de faire un reenvoie de letat de la presente sonde a la sonde 2
+			// lechange a donc eu lieu completement (Valide si etatEchangeEnvoie = ATTENTE_ACK2)
+			// A FAIRE
+			
+			// si le type de ack recu de la sonde 2 ne correspond pas a letat dattente de la sonde 1 -> ne rien faire avec ce message !!		
+		}
+		if(recoieMessage(tempNiveauAlerte2, receptAckType) == 2)
+		{
+			// IL FAUT DEMANDER UN REENVOIT...
+			
+			// 1 -> si (etatEchangeEnvoie = ATTENTE_ACK1) on revenvoit letat de la sonde 1 avec le ack a POLL
+			
+			// 2 -> si (etatEchangeEnvoie = ATTENTE_ACK2) on revenvoit letat de la sonde 1 avec le ack a ACK1
+			
+			// 3 -> si (etatEchangeEnvoie = IDLE) la sonde 1 nattendait aucun message particulier: soit on implemente un message special
+			// on peut soit ignorer et attendre au prochain poll
+			
+		}	
 	}	
 	
-	// Time out de la reception de la confirmation dalerte
 	////////////////////////////////////////////////////////////////////////////////
-	if(flagCancelAlerte) // compteur de 30 sec dattente ecoulé ...
-	{
-		printf_func("alerte annulee: 30 sec ecoule"); // debug
-		flagAttenteAlerte = false; // on arrete le compteur dattente
-		mesureStanby = false; // on peut recommencer les mesures de pH
-		niveauAlerte = 1; // le niveau dalerte retombe a la normal	
-		
-		// compteur qui verifie si ça fait plusieurs
-	}
+	// ICI: METTRE UNE FONCTION QUI COMPUTE SI ON EMET DES ULTRASONS OU NON
+	// SELON LES NIVEAU DALERTES COMBINÉS 
 	////////////////////////////////////////////////////////////////////////////////
-	
-	// Verifie si on reçoit une trame sur wireless
-	////////////////////////////////////////////////////////////////////////////////
-	if(receivedWireless == 1)
-	{			
-		messageRecu = receptionWireless(); // lit le message recu et fait gestion derreur
-	}
-	////////////////////////////////////////////////////////////////////////////////
-	
-	// si le message recu sur wireless confirme la presence dalgues bleues
-	////////////////////////////////////////////////////////////////////////////////
-	if(messageRecu == MessageAlerteHaut && flagAttenteAlerte) // si le message est un niveau dalerte haut
-	{
-		flagAttenteAlerte = false; // on arrete le compteur dattente	
-		
-		niveauAlerte = 3; // le niveau dalerte est a tres haut: emission dultrason
-		flagAttenteEmission = true;
-	}
-	////////////////////////////////////////////////////////////////////////////////
-	
-	// si le message recu sur wireless ne confirme pas la presence dalgues bleues
-	////////////////////////////////////////////////////////////////////////////////
-	if(messageRecu == MessageAlerteBas && flagAttenteAlerte) // si le message est un niveau dalerte haut
-	{
-		if(NbAlertesEnvoyee < 5) // si ca ne fait pas 5 alarmes que la premiere sonde fait
-		{
-				flagAttenteAlerte = false; // on arrete le compteur dattente
-						
-				niveauAlerte = 1; // le niveau dalerte retourne a bas pour linstant
-				flagAttenteEmission = false;
-				
-				mesureStanby = false; // on peut recommencer les mesures de pH car on nemet pas tout de suite des ultrasons	
-		}
-		if(NbAlertesEnvoyee >= 5)  // si ca fait 5 essaie que la premiere sonde fait elle ignore la confirmation de lautre et emet ultrasons
-		{
-				NbAlertesEnvoyee = 0; // on reset la sequence de non confirmation
-				flagAttenteAlerte = false; // on arrete le compteur dattente
-							
-				niveauAlerte = 3; // niveau alerte 3: la sonde emet ultrasons
-				flagAttenteEmission = true;	
-						
-		}
-	}
-	////////////////////////////////////////////////////////////////////////////////
-	
-	// si on a terminé la periode demission dultrasons
-	////////////////////////////////////////////////////////////////////////////////
-	if(flagEmissionFinie)
-	{
-		flagAttenteEmission = false; // lemission est terminé on arrete le compteur
-		
-		niveauAlerte = 1; // les algues sont peut etre eleminée lemission dultrason arrete
-		
-		mesureStanby = false; // on peut recommencer les mesures de pH
-	}
-	////////////////////////////////////////////////////////////////////////////////
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -331,7 +354,7 @@ int main(void)
 ////////////////////////////////////////////////////////////////////////////////
 
 // analyse le message recu wireless et sort le tableau recu en eliminant lentete / gestion derreurs
-char* receptionWireless()
+uint8_t recoieMessage(uint8_t message, uint8_t acktype)
 {
 	//////////
 	//////////
@@ -343,6 +366,7 @@ char* receptionWireless()
 	
 	// pour debug...
 	////////////////////////////////////////////////////////////////////////////////
+	/*
 	char buf[196];
 	char *ptr = buf;
 		
@@ -365,11 +389,12 @@ char* receptionWireless()
 	Ecris_UART( *ptr++ );
 		
 	receivedWireless = 0;
+	*/
 	////////////////////////////////////////////////////////////////////////////////
 }
 
-// envoie les messages par communication sans fils pour les niveau dalerte
-bool envoieNiveauAlerte(uint8_t niveau)
+// envoie le message par communication sans fils
+void envoieMessage(uint8_t message, uint8_t acktype)
 {
 	//////////
 	//////////
@@ -378,25 +403,10 @@ bool envoieNiveauAlerte(uint8_t niveau)
 	//////////
 	//////////
 	//////////
-	
-	switch(niveau){
-	
-		case 1:
-			// envoie message aucune alerte (niveau de base)
-			break;
-		
-		case 2:
-			// envoie message premiere detection (attente de confirmation)
-			break;
-		
-		default:
-			// envoie message alerte (emission dultrasons)
-			break;
-	}
 }
 
 // gere les leds du niveau dalerte
-void ledAlerte(uint8_t niveau)
+void ledAlerte(uint8_t etatAlerte)
 {
 	//////////
 	//////////
@@ -472,6 +482,10 @@ void set_couleur(int rouge, int bleu, int vert)
 	PORTB &= 0xDF; // niveau low = leds alumée
 	else if(compteur_color < (100 - vert))
 	PORTB |= 0x20; // niveau high = leds éteinte
+	
+	///////////////////////////////////////////
+	// MODIF POUR POUVOIR FAIRE LES DEUX SERIES DE LEDS
+	///////////////////////////////////////////
 }
 
 // INIT TIMER
@@ -494,7 +508,6 @@ void Timer_Init(void)
 	
 	TCNT3 = 0x0000; // Clear timer
 	OCR3A = 7813; // environ 1 seconde entre chaque interrupt
-	
 	
 	//Enable OCIE1A & OCIE3A Interrupt
 	TIMSK1 = 0x02;
@@ -524,6 +537,10 @@ void LED_setup(void)
 	DDRB |= 0x02; //PB1 output (bleu)
 		
 	PORTB = 0xFF; //LEDs a off
+	
+	///////////////////////////////////////////
+	// AUTRES PORTS A FAIRE POUR STRIPE DE LED 2
+	///////////////////////////////////////////
 }
 
 // FONCTION QUI EFFECTUE LA LECTURE DE LADC
@@ -531,6 +548,10 @@ float lecture_ADC(void)
 {
 	float volt = 0;
 	float Offset_ADC = 0.1;
+	
+	int ADC_value_low = 0;
+	int ADC_value_high = 0;
+	int ADC_value = 0;
 	
 	ADC_value_low = (unsigned int)ADCL; // registre low a lire en premier
 	ADC_value_high = (unsigned int)ADCH; // registre high a lire en deuxieme
@@ -555,7 +576,6 @@ char Lis_UART(void)
 {
 
 char data = 0; 
-
 
 	if(UCSR1A & (0x01 << RXC1))
 	{
