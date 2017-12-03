@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdarg.h>
 
 /*- Definitions ------------------------------------------------------------*/
 // Put your preprocessor definitions here
@@ -25,6 +26,10 @@
 
 /*- Types ------------------------------------------------------------------*/
 // Put your type definitions here
+typedef enum EtatAlerte EtatAlerte;
+typedef enum EtatComm EtatComm;
+typedef enum AckType AckType;
+typedef enum EtatAlerteGlobal EtatAlerteGlobal;
 
 /*- Prototypes -------------------------------------------------------------*/
 // Put your function prototypes here
@@ -33,25 +38,22 @@ void SYS_Init(void);
 void ADC_setup(void);
 void LED_setup(void);
 void Timer_Init(void);
-void printf_func(char* buf);
+//void printf_func(char* buf);
 
-void ledAlerte(uint8_t etatAlerte);
+void ledAlerte(EtatAlerteGlobal etatalerte);
 void ledPH(float valeurPh);
 
 void set_couleur(int rouge, int bleu, int vert);
 float lecture_ADC(void);
 float conv_PH(float adc_value);
 
-void envoieMessage(uint8_t message, uint8_t acktype);
-
-uint8_t recoieMessage(uint8_t message, uint8_t acktype);
+void envoieMessage(EtatAlerte message, AckType acktype);
+bool recoieMessage(EtatAlerte message, AckType acktype, bool CRC_confirm);
 
 char Lis_UART(void);
-void Ecris_UART(char data);
+void Ecris_UART(char *data, ...);
 void init_UART(void);
 //void wdt_disable(void);
-
-
 
 /*- Variables --------------------------------------------------------------*/
 // Put your variables here
@@ -60,33 +62,42 @@ uint8_t receivedWireless;	//cette variable deviendra 1 lorsqu'un nouveau paquet 
 
 PHY_DataInd_t ind; //cet objet contiendra les informations concernant le dernier paquet qui vient de rentrer
 
-// enum 
-enum // A FAIRE: mettre dautres valeurs a lenum ?
+enum EtatAlerte
 {
 	// niveaux dalerte
 	BAS,
 	HAUT,
 	INDETERMINE,
-	
+	ERROR_ALERTE
+};
+
+enum EtatComm
+{
 	// etat de communication
 	IDLE,
 	ATTENTE_ACK1,
-	ATTENTE_ACK2,
-	
+	ATTENTE_ACK2
+};
+
+enum AckType
+{
 	// type dacknowledge
 	POLL,
 	ACK1,
-	ACK2
+	ACK2,
+	ERROR_ACK
 };
 
-// enum pour reussite ou echec de la reception
-enum receptState
+enum EtatAlerteGlobal
 {
-	SUCCESS,
-	FAILED
+	// niveaux dalerte global pour lemission ou non de pH
+	ATTENTE,
+	AVERTISSEMENT,
+	EMISSION
 };
 
-receptState test = SUCCESS;
+
+//receptState test = SUCCESS;
 
 volatile int compteurMesurePh = 0;
 volatile int compteurAttenteConf = 0;
@@ -115,15 +126,10 @@ volatile bool flagTimeOutAck2 = false;
 volatile int intervalPoll = 20; // secondes
 volatile int TimeOutComm = 5; // secondes
 
-uint8_t niveauAlerte1 = INDETERMINE;
-uint8_t tempNiveauAlerte2 = INDETERMINE;
-uint8_t niveauAlerte2 = INDETERMINE;
-
-uint8_t etatEchangeEnvoie = IDLE;
-
-uint8_t etatEchangeRecept = IDLE;
-
-uint8_t receptAckType = INDETERMINE;
+EtatAlerte niveauAlerte1 = INDETERMINE;
+EtatAlerte tempNiveauAlerte2 = INDETERMINE;
+EtatAlerte niveauAlerte2 = INDETERMINE;
+AckType receptAckType = ERROR_ACK;
 
 bool mesureStanby = false;
 float valeurADC = 0;
@@ -131,6 +137,14 @@ float valeurPh = 7.0; // initialement PH neutre
 uint8_t seuilPh = 4; // seuil du niveau 
 uint8_t messageWireless[128];
 uint8_t NbAlertesEnvoyee = 0;
+uint8_t etatAlerteGlobal = 0;
+uint8_t compteurPerteConnexion = 0;
+uint8_t maxPerteConnexion = 5;
+bool perteConnexion = false;
+bool CRC_confirm = false;
+
+bool isWaitingAck1 = false;
+bool isWaitingAck2 = false;
 
 ////////////////////////////////////////////////////////////////////////////////
 // INTERRUPT SERVICE ROUTINE
@@ -165,23 +179,23 @@ ISR(TIMER3_COMPA_vect) {
 	*/
 	
 	// compteur de timeout de la comm si ne recoit pas dacknowledge UN (1) dans les delai requis
-	if(compteurAttenteAck1++ > TimeOutComm && flagAttenteAck1)
+	if(compteurAttenteAck1++ > TimeOutComm && isWaitingAck1)
 	{
 		compteurAttenteAck1 = 0;
-		flagAttenteAck1 = false; 
+		isWaitingAck1 = false; 
 		flagTimeOutAck1 = true;
 	}
-	else if(!flagAttenteAck1)
+	else if(!isWaitingAck1)
 	{
 		compteurAttenteAck1 = 0;
 		flagTimeOutAck1 = false;
 	}
 	
 	// compteur de timeout de la comm si ne recoit pas dacknowledge DEUX (2) dans les delai requis
-	if(compteurAttenteAck2++ > TimeOutComm && flagAttenteAck2)
+	if(compteurAttenteAck2++ > TimeOutComm && isWaitingAck2)
 	{
 		compteurAttenteAck2 = 0;
-		flagAttenteAck2 = false; 
+		isWaitingAck2 = false; 
 		flagTimeOutAck2 = true;
 	}
 	else if(!flagAttenteAck2)
@@ -231,11 +245,11 @@ static void APP_TaskHandler(void)
 		// verifie le niveau de PH
 		if(valeurPh == PH_ERROR_CODE)
 		{
-			printf_func("ATTENTION: Valeur du pH non valide");	 // debug
+			Ecris_UART("\nATTENTION: Valeur du pH non valide\n"); // debug
 		}
 		else if(valeurPh < seuilPh)
 		{
-			printf_func("detection pH trop faible: Alerte HAUT"); // debug
+			Ecris_UART("\ndetection pH trop faible: Alerte HAUT\n"); // debug
 			
 			if(niveauAlerte1 == BAS) // si changement detat on envoie un poll a lautre sonde
 			{
@@ -246,7 +260,7 @@ static void APP_TaskHandler(void)
 		}	
 		else if(valeurPh > seuilPh)
 		{
-			printf_func("detection pH OK: Alerte BAS"); // debug
+			Ecris_UART("\ndetection pH OK: Alerte BAS\n"); // debug		
 			
 			if(niveauAlerte1 == HAUT) // si changement detat on envoie un poll a lautre sonde
 			{
@@ -257,73 +271,115 @@ static void APP_TaskHandler(void)
 		}
 	}
 	
-	// Part un envoi de letat dalerte à lautre sonde ce qui est en meme temps un poll pour letat dalerte
-	// de cette deuxieme sonde
-	if(flagPoll)
+	// Si on ne connait pas letat de la sonde 2 il faut lui demander
+	if((niveauAlerte2 == INDETERMINE || niveauAlerte2 == ERROR_ALERTE) && !isWaitingAck1 && !isWaitingAck2 && !perteConnexion);
+	{
+		flagPoll = false; 
+		
+		envoieMessage(niveauAlerte1, POLL); // effectue le checksum + code dentete + envoie du poll
+		
+		isWaitingAck1 = true; // on attend un ack1 de la sonde 2
+	}
+	
+	// Si letat de la sonde 1 change il faut avertir lautre sonde
+	if(flagPoll && !isWaitingAck1 && !isWaitingAck2 && !perteConnexion); // si on a pas deja initié de communication auparavant et que letat dalerte a changé
 	{
 		flagPoll = false;
 		
 		envoieMessage(niveauAlerte1, POLL); // effectue le checksum + code dentete + envoie du poll
 		
-		etatEchangeEnvoie = ATTENTE_ACK1; // etat de lechange sans fil	
-		
-		flagAttenteAck1 = true; // part le compteur qui attend de ack de lautre sonde
+		isWaitingAck1 = true; // on attend un ack1 de la sonde 2
 	}
 	
 	// Si la sonde 2 na pas repondu dans linterval de timeout pour le ack1 
 	if(flagTimeOutAck1)
-	{
-		// A TERMINER -> ajouté un reenvoie et un compteur (apres x reenvoit on cancel)
-		
+	{	
 		flagTimeOutAck1 = false;
 		
-		etatEchangeEnvoie = IDLE;
+		isWaitingAck1 = false; // sil y a un time out on arrete dattendre le ack 1
 		
-		niveauAlerte2 = INDETERMINE;
+		niveauAlerte2 = INDETERMINE; // on ne sais pas le niveau dalerte de la sonde 2
+		
+		if(compteurPerteConnexion++ >= maxPerteConnexion) // si ca trop dessai et pas de nouvelle de la sonde 2
+			perteConnexion = true;
+			
 	}
 	
-	// Si la sonde 2 na pas repondu dans linterval de timeout pour le ack1
+	// Si la sonde 2 na pas repondu dans linterval de timeout pour le ack2
 	if(flagTimeOutAck2)
-	{
-		// A TERMINER -> ajouté un reenvoie et un compteur (apres x reenvoit on cancel)
-		
+	{		
 		flagTimeOutAck2 = false;
 		
-		etatEchangeEnvoie = IDLE;
-			
-		niveauAlerte2 = INDETERMINE;	
+		isWaitingAck2 = false; // sil y a un time out on arrete dattendre le ack 2
+		
+		// on connait le niveau dalerte de la sonde 2 mais elle ne connait peut etre pas celui de la presente sonde
+		/////////////////////////////////////////////////////////////////////////////////////////////////////
+		if(!isWaitingAck1)		// si on nest pas deja en train dattendre la reponse a un poll 
+			flagPoll = true;	// la sonde 2 na peut etre pas recu le ack1 correctement donc la presente sonde va
+								// initier elle meme un poll pour transmettre son état		
+		/////////////////////////////////////////////////////////////////////////////////////////////////////		
 	}
 	
 	// si un paquet est recu sur le wireless
 	if(receivedWireless == 1)
-	{
-		receivedWireless = 0;
+	{	
+		Ecris_UART("\nReception dun message wireless\n"); // debug
 		
-		if(recoieMessage(tempNiveauAlerte2, receptAckType) == 1)
+		if(recoieMessage(tempNiveauAlerte2, receptAckType, CRC_confirm)) // + bool par rapport au CRC
 		{
-			// si le ack type est poll -> envoie letat de la sonde avec ack1 en param
-			// A FAIRE
-			
-			// si le ack type est ack1 -> update le niveau dalerte de la sonde 2 et envoie ack2 (Valide si etatEchangeEnvoie = ATTENTE_ACK1)
-			// A FAIRE
-			
-			// si le ack type est ack2 -> on arrete le compteur qui calcul le timeout avant de faire un reenvoie de letat de la presente sonde a la sonde 2
-			// lechange a donc eu lieu completement (Valide si etatEchangeEnvoie = ATTENTE_ACK2)
-			// A FAIRE
-			
-			// si le type de ack recu de la sonde 2 ne correspond pas a letat dattente de la sonde 1 -> ne rien faire avec ce message !!		
+			if (!CRC_confirm)
+			{
+				envoieMessage(niveauAlerte1, ERROR_ACK); // envoie un message vide avec ack = error
+				
+				receivedWireless = 0; // la reception est terminée
+			}
+			if (CRC_confirm && receptAckType == ERROR_ACK && isWaitingAck1 == true)
+			{
+				envoieMessage(niveauAlerte1, POLL); // envoie le niveau dalerte sonde 1 avec ack = poll
+				
+				receivedWireless = 0; // la reception est terminée
+			}
+			if (CRC_confirm && receptAckType == ERROR_ACK && isWaitingAck2 == true)
+			{
+				envoieMessage(niveauAlerte1, ACK1); // envoie le niveau dalerte de la sonde 1 avec ack = ack1 
+				
+				receivedWireless = 0; // la reception est terminée
+			}
+			if (CRC_confirm && receptAckType == ACK1 && isWaitingAck1 == true)
+			{
+				isWaitingAck1 = false;
+		
+				niveauAlerte2 = tempNiveauAlerte2; // on update letat dalerte de la sonde 2
+				
+				envoieMessage(niveauAlerte1, ACK2); // envoie un message vide avec ack = ack2 
+				
+				receivedWireless = 0; // la reception est terminée
+			}
+			if (CRC_confirm && receptAckType == ACK2 && isWaitingAck2 == true)
+			{
+				isWaitingAck2 = false;
+				
+				receivedWireless = 0; // la reception est terminée
+			}
+			if (CRC_confirm && receptAckType == POLL)
+			{
+				envoieMessage(niveauAlerte1, ACK1); // envoie le niveau dalerte de la sonde 1 avec ack = ack1 
+				
+				niveauAlerte2 = tempNiveauAlerte2; // on update letat dalerte de la sonde 2
+				
+				isWaitingAck2 = true; // on attend de recevoir la confirmation de lautre sonde
+				
+				receivedWireless = 0; // la reception est terminée
+				
+				perteConnexion = false; // on recoit un poll -> la sonde 2 vient de se reconnecter
+				
+				compteurPerteConnexion = 0; // on recoit un poll -> la sonde 2 vient de se reconnecter							
+			}		
 		}
-		if(recoieMessage(tempNiveauAlerte2, receptAckType) == 2)
+		if(!(recoieMessage(tempNiveauAlerte2, receptAckType, CRC_confirm)))
 		{
-			// IL FAUT DEMANDER UN REENVOIT...
-			
-			// 1 -> si (etatEchangeEnvoie = ATTENTE_ACK1) on revenvoit letat de la sonde 1 avec le ack a POLL
-			
-			// 2 -> si (etatEchangeEnvoie = ATTENTE_ACK2) on revenvoit letat de la sonde 1 avec le ack a ACK1
-			
-			// 3 -> si (etatEchangeEnvoie = IDLE) la sonde 1 nattendait aucun message particulier: soit on implemente un message special
-			// on peut soit ignorer et attendre au prochain poll
-			
+			// LE MESSAGE NEST PAS DESTINÉ A LA SONDE / ON NE FAIT RIEN AVEC	
+			receivedWireless = 0; // la reception est terminée	
 		}	
 	}	
 	
@@ -353,8 +409,9 @@ int main(void)
 // FONCTIONS
 ////////////////////////////////////////////////////////////////////////////////
 
+
 // analyse le message recu wireless et sort le tableau recu en eliminant lentete / gestion derreurs
-uint8_t recoieMessage(uint8_t message, uint8_t acktype)
+bool recoieMessage(EtatAlerte message, AckType acktype, bool CRC_confirm)
 {
 	//////////
 	//////////
@@ -364,37 +421,11 @@ uint8_t recoieMessage(uint8_t message, uint8_t acktype)
 	//////////
 	//////////
 	
-	// pour debug...
-	////////////////////////////////////////////////////////////////////////////////
-	/*
-	char buf[196];
-	char *ptr = buf;
-		
-	sprintf( buf, "\n\rnew trame! size: %d, RSSI: %ddBm\n\r", ind.size, ind.rssi );
-	printf_func(buf);
-		
-	printf_func("contenu: ");
-
-	ptr = ind.data;
-	char i = 0;
-	while( i < ind.size )
-	{
-		Ecris_UART( *ptr++ );
-		i++;
-	}
-
-	sprintf( buf, "\n\r");
-	ptr = buf;
-	while( *ptr != (char)0 )
-	Ecris_UART( *ptr++ );
-		
-	receivedWireless = 0;
-	*/
-	////////////////////////////////////////////////////////////////////////////////
+	return true;
 }
 
 // envoie le message par communication sans fils
-void envoieMessage(uint8_t message, uint8_t acktype)
+void envoieMessage(EtatAlerte message, AckType acktype)
 {
 	//////////
 	//////////
@@ -406,7 +437,7 @@ void envoieMessage(uint8_t message, uint8_t acktype)
 }
 
 // gere les leds du niveau dalerte
-void ledAlerte(uint8_t etatAlerte)
+void ledAlerte(EtatAlerteGlobal etatalerteglobal)
 {
 	//////////
 	//////////
@@ -563,6 +594,7 @@ float lecture_ADC(void)
 	return volt;
 }
 
+/*
 // FONCTION UTILISÉ POUR PRINF
 void printf_func(char* buf)
 {
@@ -570,6 +602,7 @@ void printf_func(char* buf)
 	while( *ptr != (char)0 )
 	Ecris_UART( *ptr++ );
 }
+*/
 
 // Lis uart pour scanf
 char Lis_UART(void)
@@ -585,11 +618,23 @@ char data = 0;
 return data;
 }
 
-// ecrit uart pour printf
-void Ecris_UART(char data)
+// ecrire comme printf (fonction a brunet)
+void Ecris_UART(char *data, ...)
 {
-	UDR1 = data;
-	while(!(UCSR1A & (0x01 << UDRE1)));
+	char buffer[256];
+	va_list args;
+	va_start (args, data);
+	vsprintf (buffer,data, args); //cree une chaine de caracteres en formattant les arguments en entree
+
+	char i = 0;
+	while( buffer[i] != (char)0 ) //tant qu'on n'est pas arrivé à la fin de la chaîne de caractères
+	{
+		UDR1 = buffer[i];	//transmet le caractere en cours
+		while(!(UCSR1A & (0x01 << UDRE1)));	//attend que le caractère soit fini d'envoyer
+		i++;	//incrémenter l'index du caractere en cours
+	}
+
+	va_end (args);
 }
 
 // init uart
