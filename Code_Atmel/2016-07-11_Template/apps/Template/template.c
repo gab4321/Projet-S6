@@ -97,7 +97,7 @@ static void APP_TaskHandler(void)
 
 //si quelqu'un a une méthode plus propre / mieux intégrée à proposer pour faire des "printf" avec notre fonction Ecris_UART, je veux bien l'entendre! 
 	sprintf( buf, "\n\rnew trame! size: %d, RSSI: %ddBm\n\r", ind.size, ind.rssi );
-	char *ptr = buf;
+
 	while( *ptr != (char)0 )
 		Ecris_UART( *ptr++ );
 		

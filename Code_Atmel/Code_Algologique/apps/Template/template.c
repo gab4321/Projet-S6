@@ -482,7 +482,7 @@ void ledPH(float valeurPh)
 	//////////
 	//////////
 	
-	if(valeurPh >)
+	if(valeurPh >/)
 	// pour le rouge
 	if((compteur_color >= (100 - rouge)))
 	PORTB &= 0xBF; // niveau low = leds alumée
