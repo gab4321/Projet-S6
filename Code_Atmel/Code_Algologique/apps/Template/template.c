@@ -16,13 +16,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdarg.h>
 
 /*- Definitions ------------------------------------------------------------*/
 // Put your preprocessor definitions here
 #define PH_ERROR_CODE 0xFFFF
 
+//#define MESSAGE_ALERTE_HAUT "ACPDNERW" // a changer eventuellement !!!
+
 /*- Types ------------------------------------------------------------------*/
 // Put your type definitions here
+typedef enum EtatAlerte EtatAlerte;
+typedef enum EtatComm EtatComm;
+typedef enum AckType AckType;
+typedef enum EtatAlerteGlobal EtatAlerteGlobal;
 
 /*- Prototypes -------------------------------------------------------------*/
 // Put your function prototypes here
@@ -31,17 +38,22 @@ void SYS_Init(void);
 void ADC_setup(void);
 void LED_setup(void);
 void Timer_Init(void);
-void printf_func(char* buf);
-void ledAlerte(uint8_t niveau);
+//void printf_func(char* buf);
 
-char Lis_UART(void);
-void Ecris_UART(char data);
-void init_UART(void);
-//void wdt_disable(void);
+void ledAlerte(EtatAlerteGlobal etatalerte);
+void ledPH(float valeurPh);
 
 void set_couleur(int rouge, int bleu, int vert);
 float lecture_ADC(void);
 float conv_PH(float adc_value);
+
+void envoieMessage(EtatAlerte message, AckType acktype);
+bool recoieMessage(EtatAlerte message, AckType acktype, bool CRC_confirm);
+
+char Lis_UART(void);
+void Ecris_UART(char *data, ...);
+void init_UART(void);
+//void wdt_disable(void);
 
 /*- Variables --------------------------------------------------------------*/
 // Put your variables here
@@ -50,40 +62,89 @@ uint8_t receivedWireless;	//cette variable deviendra 1 lorsqu'un nouveau paquet 
 
 PHY_DataInd_t ind; //cet objet contiendra les informations concernant le dernier paquet qui vient de rentrer
 
-//////////////////////////////////////////////////
-// VARIABLES DE TEST
-volatile int compteur_color = 0;
-volatile long int compteur_test = 0;
-volatile int valeur_rouge = 0;
-volatile int valeur_vert = 0;
-volatile int valeur_bleu = 0;
-volatile int flag_test = 0;
-volatile int flag_test2 = 0;
-volatile int testt = 0;
-volatile int compteur_test2 = 0;
+enum EtatAlerte
+{
+	// niveaux dalerte
+	BAS,
+	HAUT,
+	INDETERMINE,
+	ERROR_ALERTE
+};
 
-int ii,jj,kk;
-float voltage_adc = 0;
-float PH_value = 0;
+enum EtatComm
+{
+	// etat de communication
+	IDLE,
+	ATTENTE_ACK1,
+	ATTENTE_ACK2
+};
 
-unsigned int test1 = 0;
-unsigned int test2 = 0;
+enum AckType
+{
+	// type dacknowledge
+	POLL,
+	ACK1,
+	ACK2,
+	ERROR_ACK
+};
 
-unsigned int ADC_value = 0;
-int ADC_value_low = 0;
-int ADC_value_high = 0;
+enum EtatAlerteGlobal
+{
+	// niveaux dalerte global pour lemission ou non de pH
+	ATTENTE,
+	AVERTISSEMENT,
+	EMISSION
+};
 
-//////////////////////////////////////////////////
-// VRAI VARIABLES
 
-uint8_t niveauAlerte = 1;
+//receptState test = SUCCESS;
+
 volatile int compteurMesurePh = 0;
+volatile int compteurAttenteConf = 0;
+volatile int compteurAttenteEmission = 0;
+volatile int compteurAttenteAck1 = 0;
+volatile int compteurAttenteAck2 = 0;
+volatile int compteur_color = 0;
+volatile int compteurPoll = 0;
+
 volatile uint8_t intervalMesurePh = 2; // secondes
+volatile uint8_t intervalAttenteAlerte = 30; // secondes
+volatile uint8_t intervalAttenteEmission = 30; // secondes
+
 volatile bool flagPh = false;
 volatile bool flag_ADC = false;
+volatile bool flagCancelAlerte = false;
+volatile bool flagAttenteAlerte = false;
+volatile bool flagAttenteEmission = false;
+volatile bool flagEmissionFinie = false;
+volatile bool flagPoll = false;
+volatile bool flagAttenteAck1 = false;
+volatile bool flagAttenteAck2 = false;
+volatile bool flagTimeOutAck1 = false;
+volatile bool flagTimeOutAck2 = false;
+
+volatile int intervalPoll = 20; // secondes
+volatile int TimeOutComm = 5; // secondes
+
+EtatAlerte niveauAlerte1 = INDETERMINE;
+EtatAlerte tempNiveauAlerte2 = INDETERMINE;
+EtatAlerte niveauAlerte2 = INDETERMINE;
+AckType receptAckType = ERROR_ACK;
+
+bool mesureStanby = false;
 float valeurADC = 0;
-float valeurPh = 0;
+float valeurPh = 7.0; // initialement PH neutre
 uint8_t seuilPh = 4; // seuil du niveau 
+uint8_t messageWireless[128];
+uint8_t NbAlertesEnvoyee = 0;
+uint8_t etatAlerteGlobal = 0;
+uint8_t compteurPerteConnexion = 0;
+uint8_t maxPerteConnexion = 5;
+bool perteConnexion = false;
+bool CRC_confirm = false;
+
+bool isWaitingAck1 = false;
+bool isWaitingAck2 = false;
 
 ////////////////////////////////////////////////////////////////////////////////
 // INTERRUPT SERVICE ROUTINE
@@ -92,29 +153,55 @@ uint8_t seuilPh = 4; // seuil du niveau
 // ISR DU TIMER 1
 ISR(TIMER1_COMPA_vect) {
 	
-	compteur_color++;
-	compteur_test++;
-	
-	// start ADC conversion each X seconds
-	if(compteur_test >= 100000)
-	{
-		compteur_test = 0;
-		flag_test = 1;
-	}
+	compteur_color++; // test pour fonction de leds...
 	
 	// tests leds RGB
 	//set_couleur(valeur_rouge, valeur_bleu, valeur_vert);
-	
 }
 
 // ISR du timer 3: survient a chaque seconde -> pour timer les evenements de transmission & detection des sondes
 ISR(TIMER3_COMPA_vect) {
 	
-	// 
+	// compteur pour interval de mesure du pH
 	if(compteurMesurePh++ > intervalMesurePh)
 	{
 		compteurMesurePh = 0;
 		flagPh = true;
+	}
+	
+	/*
+	// compteur pour lupdate / poll a la deuxieme sonde
+	if(compteurPoll++ > intervalPoll)
+	{
+		compteurPoll = 0;
+		flagPoll = true;
+	}
+	*/
+	
+	// compteur de timeout de la comm si ne recoit pas dacknowledge UN (1) dans les delai requis
+	if(compteurAttenteAck1++ > TimeOutComm && isWaitingAck1)
+	{
+		compteurAttenteAck1 = 0;
+		isWaitingAck1 = false; 
+		flagTimeOutAck1 = true;
+	}
+	else if(!isWaitingAck1)
+	{
+		compteurAttenteAck1 = 0;
+		flagTimeOutAck1 = false;
+	}
+	
+	// compteur de timeout de la comm si ne recoit pas dacknowledge DEUX (2) dans les delai requis
+	if(compteurAttenteAck2++ > TimeOutComm && isWaitingAck2)
+	{
+		compteurAttenteAck2 = 0;
+		isWaitingAck2 = false; 
+		flagTimeOutAck2 = true;
+	}
+	else if(!flagAttenteAck2)
+	{
+		compteurAttenteAck2 = 0;
+		flagTimeOutAck2 = false;
 	}
 }
 
@@ -131,109 +218,175 @@ ISR(ADC_vect)
 
 static void APP_TaskHandler(void)
 {
-	// update les leds de niveau dalerte
-	ledAlerte(niveauAlerte);
+	// Update les leds de niveau dalerte
+	ledAlerte(1); // A FAIRE: METTRE BONNE VARIABLE
 	
-	// mesure du PH en boucle
-	////////////////////////////////////////////////////////////////////////////////
+	// Update les leds de niveau de pH
+	ledPH(valeurPh);
+	
+	// Part la convertion dADC a chaque 30 secondes pour updater letat de la sonde
 	if(flagPh)
 	{
 		flagPh = false;
+		
 		start_ADC();
 	}
 
+	// mesure ADC terminée: on calcul la valeur du pH et on update letat de la presente sonde
 	if(flag_ADC)
 	{
 		flag_ADC = false;
 		
 		valeurADC = lecture_ADC();
 		
+		valeurPh = conv_PH(valeurADC); 
+	
 		
-		
-		valeurPh = conv_PH(valeurADC);
-		
-		if (valeurPh == PH_ERROR_CODE)
+		// verifie le niveau de PH
+		if(valeurPh == PH_ERROR_CODE)
 		{
-			printf_func("ATTENTION: Valeur du pH non valide");		
-		}		
-	}
-	////////////////////////////////////////////////////////////////////////////////
-	
-	// verifie le niveau de PH
-	////////////////////////////////////////////////////////////////////////////////
-	if(valeurPh < seuilPh)
-	{
-		niveauAlerte = 2; // 
-		
-	}
-	
-	
-	
-	
-	
-	////////////////////////////////////////////////////////////////////////////////
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	/*
-  char receivedUart = 0;
-
-  receivedUart = Lis_UART();  
-  if(receivedUart) //est-ce qu'un caractere a été recu par l'UART?
-  {
-	  Ecris_UART(receivedUart);	//envoie l'echo du caractere recu par l'UART
-
-	  if(receivedUart == 'a')	//est-ce 
-	  .que le caractere recu est 'a'? 
-		{
-		uint8_t demonstration_string[128] = "123456789A"; //data packet bidon
-		Ecris_Wireless(demonstration_string, 10); //envoie le data packet; nombre d'éléments utiles du paquet à envoyer
+			Ecris_UART("\nATTENTION: Valeur du pH non valide\n"); // debug
 		}
-  }
-  */
-  
-  /*
-  if(receivedWireless == 1) //est-ce qu'un paquet a été recu sur le wireless? 
-  {
-	char buf[196];
-
-	//si quelqu'un a une méthode plus propre / mieux intégrée à proposer pour faire des "printf" avec notre fonction Ecris_UART, je veux bien l'entendre! 
-	sprintf( buf, "\n\rnew trame! size: %d, RSSI: %ddBm\n\r", ind.size, ind.rssi );
-	char *ptr = buf;
-	while( *ptr != (char)0 )
-		Ecris_UART( *ptr++ );
-		
-	sprintf( buf, "contenu: ");
-	ptr = buf;
-	while( *ptr != (char)0 )
-		Ecris_UART( *ptr++ );
-
-	ptr = ind.data;
-	char i = 0;
-	while( i < ind.size )
-	{
-		Ecris_UART( *ptr++ );
-		i++;
+		else if(valeurPh < seuilPh)
+		{
+			Ecris_UART("\ndetection pH trop faible: Alerte HAUT\n"); // debug
+			
+			if(niveauAlerte1 == BAS) // si changement detat on envoie un poll a lautre sonde
+			{
+				flagPoll = true;
+			}
+			
+			niveauAlerte1 = HAUT; 
+		}	
+		else if(valeurPh > seuilPh)
+		{
+			Ecris_UART("\ndetection pH OK: Alerte BAS\n"); // debug		
+			
+			if(niveauAlerte1 == HAUT) // si changement detat on envoie un poll a lautre sonde
+			{
+				flagPoll = true;
+			}
+			
+			niveauAlerte1 = BAS; 		
+		}
 	}
-
-	sprintf( buf, "\n\r");
-	ptr = buf;
-	while( *ptr != (char)0 )
-		Ecris_UART( *ptr++ );
 	
-	receivedWireless = 0; 
-  }
-  */
+	// Si on ne connait pas letat de la sonde 2 il faut lui demander
+	if((niveauAlerte2 == INDETERMINE || niveauAlerte2 == ERROR_ALERTE) && !isWaitingAck1 && !isWaitingAck2 && !perteConnexion);
+	{
+		flagPoll = false; 
+		
+		envoieMessage(niveauAlerte1, POLL); // effectue le checksum + code dentete + envoie du poll
+		
+		isWaitingAck1 = true; // on attend un ack1 de la sonde 2
+	}
+	
+	// Si letat de la sonde 1 change il faut avertir lautre sonde
+	if(flagPoll && !isWaitingAck1 && !isWaitingAck2 && !perteConnexion); // si on a pas deja initié de communication auparavant et que letat dalerte a changé
+	{
+		flagPoll = false;
+		
+		envoieMessage(niveauAlerte1, POLL); // effectue le checksum + code dentete + envoie du poll
+		
+		isWaitingAck1 = true; // on attend un ack1 de la sonde 2
+	}
+	
+	// Si la sonde 2 na pas repondu dans linterval de timeout pour le ack1 
+	if(flagTimeOutAck1)
+	{	
+		flagTimeOutAck1 = false;
+		
+		isWaitingAck1 = false; // sil y a un time out on arrete dattendre le ack 1
+		
+		niveauAlerte2 = INDETERMINE; // on ne sais pas le niveau dalerte de la sonde 2
+		
+		if(compteurPerteConnexion++ >= maxPerteConnexion) // si ca trop dessai et pas de nouvelle de la sonde 2
+			perteConnexion = true;
+			
+	}
+	
+	// Si la sonde 2 na pas repondu dans linterval de timeout pour le ack2
+	if(flagTimeOutAck2)
+	{		
+		flagTimeOutAck2 = false;
+		
+		isWaitingAck2 = false; // sil y a un time out on arrete dattendre le ack 2
+		
+		// on connait le niveau dalerte de la sonde 2 mais elle ne connait peut etre pas celui de la presente sonde
+		/////////////////////////////////////////////////////////////////////////////////////////////////////
+		if(!isWaitingAck1)		// si on nest pas deja en train dattendre la reponse a un poll 
+			flagPoll = true;	// la sonde 2 na peut etre pas recu le ack1 correctement donc la presente sonde va
+								// initier elle meme un poll pour transmettre son état		
+		/////////////////////////////////////////////////////////////////////////////////////////////////////		
+	}
+	
+	// si un paquet est recu sur le wireless
+	if(receivedWireless == 1)
+	{	
+		Ecris_UART("\nReception dun message wireless\n"); // debug
+		
+		if(recoieMessage(tempNiveauAlerte2, receptAckType, CRC_confirm)) // + bool par rapport au CRC
+		{
+			if (!CRC_confirm)
+			{
+				envoieMessage(niveauAlerte1, ERROR_ACK); // envoie un message vide avec ack = error
+				
+				receivedWireless = 0; // la reception est terminée
+			}
+			if (CRC_confirm && receptAckType == ERROR_ACK && isWaitingAck1 == true)
+			{
+				envoieMessage(niveauAlerte1, POLL); // envoie le niveau dalerte sonde 1 avec ack = poll
+				
+				receivedWireless = 0; // la reception est terminée
+			}
+			if (CRC_confirm && receptAckType == ERROR_ACK && isWaitingAck2 == true)
+			{
+				envoieMessage(niveauAlerte1, ACK1); // envoie le niveau dalerte de la sonde 1 avec ack = ack1 
+				
+				receivedWireless = 0; // la reception est terminée
+			}
+			if (CRC_confirm && receptAckType == ACK1 && isWaitingAck1 == true)
+			{
+				isWaitingAck1 = false;
+		
+				niveauAlerte2 = tempNiveauAlerte2; // on update letat dalerte de la sonde 2
+				
+				envoieMessage(niveauAlerte1, ACK2); // envoie un message vide avec ack = ack2 
+				
+				receivedWireless = 0; // la reception est terminée
+			}
+			if (CRC_confirm && receptAckType == ACK2 && isWaitingAck2 == true)
+			{
+				isWaitingAck2 = false;
+				
+				receivedWireless = 0; // la reception est terminée
+			}
+			if (CRC_confirm && receptAckType == POLL)
+			{
+				envoieMessage(niveauAlerte1, ACK1); // envoie le niveau dalerte de la sonde 1 avec ack = ack1 
+				
+				niveauAlerte2 = tempNiveauAlerte2; // on update letat dalerte de la sonde 2
+				
+				isWaitingAck2 = true; // on attend de recevoir la confirmation de lautre sonde
+				
+				receivedWireless = 0; // la reception est terminée
+				
+				perteConnexion = false; // on recoit un poll -> la sonde 2 vient de se reconnecter
+				
+				compteurPerteConnexion = 0; // on recoit un poll -> la sonde 2 vient de se reconnecter							
+			}		
+		}
+		if(!(recoieMessage(tempNiveauAlerte2, receptAckType, CRC_confirm)))
+		{
+			// LE MESSAGE NEST PAS DESTINÉ A LA SONDE / ON NE FAIT RIEN AVEC	
+			receivedWireless = 0; // la reception est terminée	
+		}	
+	}	
+	
+	////////////////////////////////////////////////////////////////////////////////
+	// ICI: METTRE UNE FONCTION QUI COMPUTE SI ON EMET DES ULTRASONS OU NON
+	// SELON LES NIVEAU DALERTES COMBINÉS 
+	////////////////////////////////////////////////////////////////////////////////
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -256,10 +409,55 @@ int main(void)
 // FONCTIONS
 ////////////////////////////////////////////////////////////////////////////////
 
-// gere les leds du niveau dalerte
-void ledAlerte(uint8_t niveau)
+
+// analyse le message recu wireless et sort le tableau recu en eliminant lentete / gestion derreurs
+bool recoieMessage(EtatAlerte message, AckType acktype, bool CRC_confirm)
 {
+	//////////
+	//////////
+	//////////
 	// A FAIRE
+	//////////
+	//////////
+	//////////
+	
+	return true;
+}
+
+// envoie le message par communication sans fils
+void envoieMessage(EtatAlerte message, AckType acktype)
+{
+	//////////
+	//////////
+	//////////
+	// A FAIRE
+	//////////
+	//////////
+	//////////
+}
+
+// gere les leds du niveau dalerte
+void ledAlerte(EtatAlerteGlobal etatalerteglobal)
+{
+	//////////
+	//////////
+	//////////
+	// A FAIRE
+	//////////
+	//////////
+	//////////
+}
+
+// gere les leds du niveau de pH
+void ledPH(float valeurPh)
+{
+	//////////
+	//////////
+	//////////
+	// A FAIRE
+	//////////
+	//////////
+	//////////
 }
 
 //FONCTION D'INITIALISATION
@@ -315,6 +513,10 @@ void set_couleur(int rouge, int bleu, int vert)
 	PORTB &= 0xDF; // niveau low = leds alumée
 	else if(compteur_color < (100 - vert))
 	PORTB |= 0x20; // niveau high = leds éteinte
+	
+	///////////////////////////////////////////
+	// MODIF POUR POUVOIR FAIRE LES DEUX SERIES DE LEDS
+	///////////////////////////////////////////
 }
 
 // INIT TIMER
@@ -337,7 +539,6 @@ void Timer_Init(void)
 	
 	TCNT3 = 0x0000; // Clear timer
 	OCR3A = 7813; // environ 1 seconde entre chaque interrupt
-	
 	
 	//Enable OCIE1A & OCIE3A Interrupt
 	TIMSK1 = 0x02;
@@ -367,25 +568,21 @@ void LED_setup(void)
 	DDRB |= 0x02; //PB1 output (bleu)
 		
 	PORTB = 0xFF; //LEDs a off
+	
+	///////////////////////////////////////////
+	// AUTRES PORTS A FAIRE POUR STRIPE DE LED 2
+	///////////////////////////////////////////
 }
-
-/*
-// NE SAIS PAS CE QUE CA FAIT: A VOIR ***
-void wdt_disable(void) // cest utile ??
-{
-	// Disable watchdog timer
-	asm("wdr");
-	MCUSR = 0;
-	WDTCSR |= (1 << WDCE) | (1 << WDE);
-	WDTCSR = 0x00;
-}
-*/
 
 // FONCTION QUI EFFECTUE LA LECTURE DE LADC
 float lecture_ADC(void)
 {
 	float volt = 0;
 	float Offset_ADC = 0.1;
+	
+	int ADC_value_low = 0;
+	int ADC_value_high = 0;
+	int ADC_value = 0;
 	
 	ADC_value_low = (unsigned int)ADCL; // registre low a lire en premier
 	ADC_value_high = (unsigned int)ADCH; // registre high a lire en deuxieme
@@ -397,6 +594,7 @@ float lecture_ADC(void)
 	return volt;
 }
 
+/*
 // FONCTION UTILISÉ POUR PRINF
 void printf_func(char* buf)
 {
@@ -404,13 +602,13 @@ void printf_func(char* buf)
 	while( *ptr != (char)0 )
 	Ecris_UART( *ptr++ );
 }
+*/
 
 // Lis uart pour scanf
 char Lis_UART(void)
 {
 
 char data = 0; 
-
 
 	if(UCSR1A & (0x01 << RXC1))
 	{
@@ -420,11 +618,23 @@ char data = 0;
 return data;
 }
 
-// ecrit uart pour printf
-void Ecris_UART(char data)
+// ecrire comme printf (fonction a brunet)
+void Ecris_UART(char *data, ...)
 {
-	UDR1 = data;
-	while(!(UCSR1A & (0x01 << UDRE1)));
+	char buffer[256];
+	va_list args;
+	va_start (args, data);
+	vsprintf (buffer,data, args); //cree une chaine de caracteres en formattant les arguments en entree
+
+	char i = 0;
+	while( buffer[i] != (char)0 ) //tant qu'on n'est pas arrivé à la fin de la chaîne de caractères
+	{
+		UDR1 = buffer[i];	//transmet le caractere en cours
+		while(!(UCSR1A & (0x01 << UDRE1)));	//attend que le caractère soit fini d'envoyer
+		i++;	//incrémenter l'index du caractere en cours
+	}
+
+	va_end (args);
 }
 
 // init uart
@@ -444,6 +654,18 @@ void start_ADC()
 {
 	ADCSRA |= 0b01000000;
 }
+
+/*
+// NE SAIS PAS CE QUE CA FAIT: A VOIR ***
+void wdt_disable(void) // cest utile ??
+{
+	// Disable watchdog timer
+	asm("wdr");
+	MCUSR = 0;
+	WDTCSR |= (1 << WDCE) | (1 << WDE);
+	WDTCSR = 0x00;
+}
+*/
 
 
 
