@@ -6,3 +6,7 @@
 
 ..\template.c
 
+crc16.c
+
+crc8.c
+

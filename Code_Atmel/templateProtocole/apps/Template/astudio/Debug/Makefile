@@ -43,7 +43,9 @@ SUBDIRS :=  \
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS +=  \
 ../../../../phy/atmegarfr2/src/phy.c \
-../../template.c
+../../template.c \
+../crc16.c \
+../crc8.c
 
 
 PREPROCESSING_SRCS += 
@@ -54,19 +56,27 @@ ASM_SRCS +=
 
 OBJS +=  \
 stack/phy/atmegarfr2/src/phy.o \
-template.o
+template.o \
+crc16.o \
+crc8.o
 
 OBJS_AS_ARGS +=  \
 stack/phy/atmegarfr2/src/phy.o \
-template.o
+template.o \
+crc16.o \
+crc8.o
 
 C_DEPS +=  \
 stack/phy/atmegarfr2/src/phy.d \
-template.d
+template.d \
+crc16.d \
+crc8.d
 
 C_DEPS_AS_ARGS +=  \
 stack/phy/atmegarfr2/src/phy.d \
-template.d
+template.d \
+crc16.d \
+crc8.d
 
 OUTPUT_FILE_PATH +=Template.elf
 
@@ -87,6 +97,10 @@ LINKER_SCRIPT_DEP+=
 
 
 
+
+
+
+
 stack/phy/atmegarfr2/src/%.o: ../../../../phy/atmegarfr2/src/%.c
 	@echo Building file: $<
 	@echo Invoking: AVR/GNU C Compiler : 4.9.2
@@ -95,6 +109,13 @@ stack/phy/atmegarfr2/src/%.o: ../../../../phy/atmegarfr2/src/%.c
 	
 
 ./%.o: ../../%.c
+	@echo Building file: $<
+	@echo Invoking: AVR/GNU C Compiler : 4.9.2
+	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avr8-gnu-toolchain\bin\avr-gcc.exe$(QUOTE)  -x c -funsigned-char -funsigned-bitfields -DPHY_ATMEGARFR2 -DHAL_ATMEGA256RFR2 -DPLATFORM_XPLAINED_PRO_ATMEGA256RFR2 -DF_CPU=8000000  -I"../../../../hal/atmega256rfr2/inc" -I"../../../../phy/atmegarfr2/inc" -I"../../../../nwk/inc" -I"../../../../sys/inc" -I"../.." -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\ATmega_DFP\1.1.130\include"  -Os -fdata-sections -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -g3 -Wall -mmcu=atmega256rfr2 -B "C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\ATmega_DFP\1.1.130\gcc\dev\atmega256rfr2" -c -std=gnu99 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
+	@echo Finished building: $<
+	
+
+./%.o: .././%.c
 	@echo Building file: $<
 	@echo Invoking: AVR/GNU C Compiler : 4.9.2
 	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avr8-gnu-toolchain\bin\avr-gcc.exe$(QUOTE)  -x c -funsigned-char -funsigned-bitfields -DPHY_ATMEGARFR2 -DHAL_ATMEGA256RFR2 -DPLATFORM_XPLAINED_PRO_ATMEGA256RFR2 -DF_CPU=8000000  -I"../../../../hal/atmega256rfr2/inc" -I"../../../../phy/atmegarfr2/inc" -I"../../../../nwk/inc" -I"../../../../sys/inc" -I"../.." -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\ATmega_DFP\1.1.130\include"  -Os -fdata-sections -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -g3 -Wall -mmcu=atmega256rfr2 -B "C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\ATmega_DFP\1.1.130\gcc\dev\atmega256rfr2" -c -std=gnu99 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 

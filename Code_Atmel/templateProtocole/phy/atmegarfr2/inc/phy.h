@@ -52,6 +52,7 @@
 #include <stdbool.h>
 #include "sysConfig.h"
 
+
 /*- Definitions ------------------------------------------------------------*/
 #define PHY_RSSI_BASE_VAL                     (-90)
 
