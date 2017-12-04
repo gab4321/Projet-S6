@@ -103,6 +103,8 @@ volatile int compteurAttenteAck1 = 0;
 volatile int compteurAttenteAck2 = 0;
 volatile int compteur_color = 0;
 volatile int compteurPoll = 0;
+volatile int compteurTimeOutEmission1 = 0;
+volatile int compteurTimeOutEmission2 = 0;
 
 volatile int intervalMesurePh = 2; // secondes
 volatile uint8_t intervalAttenteAlerte = 30; // secondes
@@ -119,9 +121,17 @@ volatile bool flagAttenteAck1 = false;
 volatile bool flagAttenteAck2 = false;
 volatile bool flagTimeOutAck1 = false;
 volatile bool flagTimeOutAck2 = false;
+volatile bool flagConfSonde1 = false;
+volatile bool flagConfSonde2 = false;
+volatile bool isCountingAttenteSonde1 = false;
+volatile bool isCountingAttenteSonde2 = false;
+volatile bool flagTimeOutEmission1 = false;
+volatile bool flagTimeOutEmission2 = false;
 
 volatile int intervalPoll = 20; // secondes
 volatile int TimeOutComm = 5; // secondes
+volatile int TimeOutEmission1 = 10; // secondes
+volatile int TimeOutEmission2 = 10; // secondes
 
 EtatAlerte niveauAlerte1 = INDETERMINE;
 EtatAlerte tempNiveauAlerte2 = INDETERMINE;
@@ -135,7 +145,6 @@ float valeurPh = 7.0; // initialement PH neutre
 uint8_t seuilPh = 4; // seuil du niveau 
 uint8_t messageWireless[128];
 uint8_t NbAlertesEnvoyee = 0;
-uint8_t etatAlerteGlobal = 0;
 uint8_t compteurPerteConnexion = 0;
 uint8_t maxPerteConnexion = 5;
 bool perteConnexion = false;
@@ -201,6 +210,33 @@ ISR(TIMER3_COMPA_vect) {
 		compteurAttenteAck2 = 0;
 		flagTimeOutAck2 = false;
 	}
+	
+	if(flagConfSonde1)
+	{
+		if(compteurTimeOutEmission1++ > TimeOutEmission1)
+		{
+			compteurTimeOutEmission1 = 0;
+			flagTimeOutEmission1 = true;
+		}
+	}
+	else
+	{
+		compteurTimeOutEmission1 = 0;
+	}
+	
+	if(flagConfSonde2)
+	{
+		if(compteurTimeOutEmission2++ > TimeOutEmission2)
+		{
+			compteurTimeOutEmission2 = 0;
+			flagTimeOutEmission2 = true;
+		}
+	}
+	else
+	{
+		compteurTimeOutEmission2 = 0;
+	}
+	
 }
 
 // ISR DE LADC
@@ -217,7 +253,7 @@ ISR(ADC_vect)
 static void APP_TaskHandler(void)
 {
 	// Update les leds de niveau dalerte
-	ledAlerte(etatAlerteGlobal); // A FAIRE: METTRE BONNE VARIABLE
+	ledAlerte(etatAlerteGlobal);
 	
 	// Update les leds de niveau de pH
 	ledPH(valeurPh);
@@ -254,7 +290,7 @@ static void APP_TaskHandler(void)
 			if(niveauAlerte1 == BAS) // si changement detat on envoie un poll a lautre sonde
 			{
 				flagPoll = true;
-				Ecris_UART("\nLe niveau dalerte sonde 1 passe de bas a haut\n"); // debug
+				Ecris_UART("\nLe niveau dalerte sonde 1 passe de BAS a HAUT\n"); // debug
 			}
 			
 			niveauAlerte1 = HAUT; 
@@ -266,7 +302,7 @@ static void APP_TaskHandler(void)
 			if(niveauAlerte1 == HAUT) // si changement detat on envoie un poll a lautre sonde
 			{
 				flagPoll = true;
-				Ecris_UART("\nLe niveau dalerte sonde 1 passe de haut a bas\n"); // debug
+				Ecris_UART("\nLe niveau dalerte sonde 1 passe de HAUT a BAS\n"); // debug
 			}
 			
 			niveauAlerte1 = BAS; 		
@@ -284,7 +320,7 @@ static void APP_TaskHandler(void)
 	}
 	
 	// Si letat de la sonde 1 change il faut avertir lautre sonde
-	if(flagPoll && !isWaitingAck1 && !isWaitingAck2 && !perteConnexion); // si on a pas deja initié de communication auparavant et que letat dalerte a changé
+	if(flagPoll && !isWaitingAck1 && !isWaitingAck2 && !perteConnexion);
 	{
 		flagPoll = false;
 		
@@ -302,13 +338,13 @@ static void APP_TaskHandler(void)
 		
 		niveauAlerte2 = INDETERMINE; // on ne sais pas le niveau dalerte de la sonde 2
 		
-		Ecris_UART("\nLa sonde 1 na pas recu dack de sonde 2 dans le delai prescrit\n"); // debug
+		Ecris_UART("\nLa sonde 1 na pas recu de ack de sonde 2 dans le delai prescrit\n"); // debug
 		
 		if(compteurPerteConnexion++ >= maxPerteConnexion) // si ca trop dessai et pas de nouvelle de la sonde 2
 		{
 			perteConnexion = true;
 			compteurPerteConnexion = 0;
-			Ecris_UART("\nTrop dessais de comm on eu lieu on rejette letat de la sonde 2 dans la prise de decision pour linstant\n"); // debug		
+			Ecris_UART("\nTrop dessais de comm: on rejette letat de la sonde 2 pour linstant\n"); // debug		
 		}			
 	}
 	
@@ -321,7 +357,7 @@ static void APP_TaskHandler(void)
 		
 		// on connait le niveau dalerte de la sonde 2 mais elle ne connait peut etre pas celui de la presente sonde
 		/////////////////////////////////////////////////////////////////////////////////////////////////////
-		if(!isWaitingAck1)		// si on nest pas deja en train dattendre la reponse a un poll 
+		if(!isWaitingAck1 && !flagPoll)		// si on nest pas deja en train dattendre la reponse a un poll 
 			flagPoll = true;	// la sonde 2 na peut etre pas recu le ack1 correctement donc la presente sonde va
 								// initier elle meme un poll pour transmettre son état		
 		/////////////////////////////////////////////////////////////////////////////////////////////////////		
@@ -332,7 +368,7 @@ static void APP_TaskHandler(void)
 	{	
 		Ecris_UART("\nReception dun message wireless\n"); // debug
 		
-		if(recoieMessage(tempNiveauAlerte2, receptAckType, CRC_confirm)) // + bool par rapport au CRC
+		if(recoieMessage(tempNiveauAlerte2, receptAckType, CRC_confirm))
 		{
 			if (!CRC_confirm)
 			{
@@ -342,7 +378,7 @@ static void APP_TaskHandler(void)
 			}
 			if (CRC_confirm && receptAckType == ERROR_ACK && isWaitingAck1 == true)
 			{
-				envoieMessage(niveauAlerte1, POLL); // envoie le niveau dalerte sonde 1 avec ack = poll
+				envoieMessage(niveauAlerte1, POLL); // envoie le niveau dalerte son de 1 avec ack = poll
 				
 				receivedWireless = 0; // la reception est terminée
 			}
@@ -357,6 +393,13 @@ static void APP_TaskHandler(void)
 				isWaitingAck1 = false;
 		
 				niveauAlerte2 = tempNiveauAlerte2; // on update letat dalerte de la sonde 2
+				
+				if(niveauAlerte2 == HAUT)
+					Ecris_UART("\nReception niveau alerte sonde 2: HAUT\n"); // debug
+				else if(niveauAlerte2 == BAS)
+					Ecris_UART("\nReception niveau alerte sonde 2: BAS\n"); // debug				
+				else
+					Ecris_UART("\nReception niveau alerte sonde 2: INDETERMINE\n"); // debug				
 				
 				envoieMessage(niveauAlerte1, ACK2); // envoie un message vide avec ack = ack2 
 				
@@ -374,13 +417,20 @@ static void APP_TaskHandler(void)
 				
 				niveauAlerte2 = tempNiveauAlerte2; // on update letat dalerte de la sonde 2
 				
+				if(niveauAlerte2 == HAUT)
+					Ecris_UART("\nReception niveau alerte sonde 2: HAUT\n"); // debug
+				else if(niveauAlerte2 == BAS)
+					Ecris_UART("\nReception niveau alerte sonde 2: BAS\n"); // debug				
+				else
+					Ecris_UART("\nReception niveau alerte sonde 2: INDETERMINE\n"); // debug
+									
 				isWaitingAck2 = true; // on attend de recevoir la confirmation de lautre sonde
 				
 				receivedWireless = 0; // la reception est terminée
 				
-				perteConnexion = false; // on recoit un poll -> la sonde 2 vient de se reconnecter
+				perteConnexion = false; // on recoit un poll -> la sonde 2 vient de se reconnecter (en cas de perte de connexion)
 				
-				compteurPerteConnexion = 0; // on recoit un poll -> la sonde 2 vient de se reconnecter							
+				compteurPerteConnexion = 0; // on recoit un poll -> la sonde 2 vient de se reconnecter (en cas de perte de connexion)					
 			}		
 		}
 		if(!(recoieMessage(tempNiveauAlerte2, receptAckType, CRC_confirm)))
@@ -390,27 +440,64 @@ static void APP_TaskHandler(void)
 		}	
 	}	
 	
+	// On compute ici avec quelques conditions si la presente sonde doit emettre des ultrasons ou non 
 	////////////////////////////////////////////////////////////////////////////////
-	// ICI: METTRE UNE FONCTION QUI COMPUTE SI ON EMET DES ULTRASONS OU NON
-	// SELON LES NIVEAU DALERTES COMBINÉS 
-	////////////////////////////////////////////////////////////////////////////////
-	//perteConnexion
-	//niveauAlerte2
-	//niveauAlerte1
 	
-	////////////////////////////////////////////////////////////////////////////////
+	// la sonde 2 nest plus connecté on prend en compte seulement la sonde 1
 	if(perteConnexion && niveauAlerte1 == HAUT)
 		etatAlerteGlobal = EMISSION;
+	
+	// la sonde 2 nest plus connecté on prend en compte seulement la sonde 1
+	if(perteConnexion && niveauAlerte1 == BAS)
+		etatAlerteGlobal = ATTENTE;
 		
+	// la sonde 1 a une alerte haute mais on ne connait pas encore letat de la sonde 2
 	if(!perteConnexion && niveauAlerte1 == HAUT && (niveauAlerte2 == INDETERMINE || niveauAlerte2 == ERROR_ALERTE))
 		etatAlerteGlobal = AVERTISSEMENT;
 		
-	if(!perteConnexion && niveauAlerte1 == HAUT && niveauAlerte2 == HAUT)
-		etatAlerteGlobal = HAUT;
+	// la sonde 1 a une alerte basse mais on ne connait pas encore letat de la sonde 2
+	if(!perteConnexion && niveauAlerte1 == BAS && (niveauAlerte2 == INDETERMINE || niveauAlerte2 == ERROR_ALERTE))
+		etatAlerteGlobal = ATTENTE;
+
+	// la sonde 1 et la sonde 2 ont un etat dalerte bas	
+	if(!perteConnexion && niveauAlerte1 == BAS && niveauAlerte2 == BAS)
+		etatAlerteGlobal = ATTENTE;
+
+	// la sonde 1 a une alerte haute et la sonde 2 reste a alerte basse		
+	if(!perteConnexion && niveauAlerte1 == HAUT && niveauAlerte2 == BAS)
+	{
+		flagConfSonde1 = true;
 		
-	if(!perteConnexion && niveauAlerte1 == HAUT && niveauAlerte2 == HAUT)
-		etatAlerteGlobal = HAUT;
-	////////////////////////////////////////////////////////////////////////////////	
+		if(flagTimeOutEmission1)
+			etatAlerteGlobal = EMISSION;
+		else
+			etatAlerteGlobal = AVERTISSEMENT;
+	}
+	else
+	{
+		flagConfSonde1 = false;	
+		isCountingAttenteSonde1 = false;
+		flagTimeOutEmission1 = false;	
+	}
+
+	// la sonde 2 a une alerte haute et la sonde 1 reste a alerte basse			
+	if(!perteConnexion && niveauAlerte1 == BAS && niveauAlerte2 == HAUT)
+	{
+		flagConfSonde1 = true;
+		
+		if(flagTimeOutEmission2)
+			etatAlerteGlobal = EMISSION;
+		else
+			etatAlerteGlobal = AVERTISSEMENT;
+	}
+	else
+	{
+		flagConfSonde2 = false;	
+		isCountingAttenteSonde2 = false;
+		flagTimeOutEmission2 = false;		
+	}
+	////////////////////////////////////////////////////////////////////////////////
+		
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -462,45 +549,73 @@ void envoieMessage(EtatAlerte message, AckType acktype)
 // gere les leds du niveau dalerte
 void ledAlerte(EtatAlerteGlobal etatalerteglobal)
 {
-	//////////
-	//////////
-	//////////
-	// A MODIFIER
-	//////////
-	//////////
-	//////////
+	///////////////////////////////////////////////////////////////////////////////////////
+	// A TITRE DEXEMPLE: POSSIBILITÉ DE CODER DES LUMIERE QUI FLACHENT OU CODE DE COULEUR
+	///////////////////////////////////////////////////////////////////////////////////////
+	
+	// sur port B
+	
+	if(etatalerteglobal == ATTENTE) // allume leds vert et eteint les autres
+	{
+		PORTB |= 0x40; // (ROUGE)
+		PORTB |= 0x02; // (BLEU)
+		PORTB &= 0xDF; // (VERT)		
+	}
+	else if(etatalerteglobal == AVERTISSEMENT) // allume leds bleu et eteint les autres
+	{
+		PORTB |= 0x40; // (ROUGE)
+		PORTB &= 0xFD; // (BLEU)
+		PORTB |= 0x20; // (VERT)		
+	}
+	else if(etatalerteglobal == EMISSION) // allume leds rouge et eteint les autres
+	{
+		PORTB &= 0xBF; // (ROUGE)
+		PORTB |= 0x02; // (BLEU)
+		PORTB |= 0x20; // (VERT)
+	}
+	else
+	{
+		PORTB |= 0x40; // (ROUGE)
+		PORTB |= 0x02; // (BLEU)
+		PORTB |= 0x20; // (VERT)		
+	}
 }
 
 // gere les leds du niveau de pH
 void ledPH(float valeurPh)
 {
-	//////////
-	//////////
-	//////////
-	// A MODIFIER
-	//////////
-	//////////
-	//////////
+	///////////////////////////////////////////////////////////////////////////////////////
+	// A TITRE DEXEMPLE: POSSIBILITÉ DE CODER DES LUMIERE QUI FLACHENT OU CODE DE COULEUR
+	///////////////////////////////////////////////////////////////////////////////////////
 	
-	if(valeurPh >/)
-	// pour le rouge
-	if((compteur_color >= (100 - rouge)))
-	PORTB &= 0xBF; // niveau low = leds alumée
-	else if(compteur_color < (100 - rouge))
-	PORTB |= 0x40; // niveau high = leds éteinte
+	///////////////////////////
+	// sur port A DETERMINER
+	///////////////////////////
 		
-	// pour le bleu
-	if((compteur_color >= (100 - bleu)))
-	PORTB &= 0xFD; // niveau low = leds alumée
-	else if(compteur_color < (100 - bleu))
-	PORTB |= 0x02; // niveau high = leds éteinte
-
-	// pour le vert
-	if((compteur_color >= (100 - vert)))
-	PORTB &= 0xDF; // niveau low = leds alumée
-	else if(compteur_color < (100 - vert))
-	PORTB |= 0x20; // niveau high = leds éteinte
-	
+	if((valeurPh < 7.0) && (valeurPh > 6.0)) // allume leds vert et eteint les autres
+	{
+		PORTB |= 0x40; // (ROUGE)
+		PORTB |= 0x02; // (BLEU)
+		PORTB &= 0xDF; // (VERT)
+	}
+	else if(valeurPh > 7.0) // allume leds bleu et eteint les autres
+	{
+		PORTB |= 0x40; // (ROUGE)
+		PORTB &= 0xFD; // (BLEU)
+		PORTB |= 0x20; // (VERT)
+	}
+	else if(valeurPh < 6.0) // allume leds rouge et eteint les autres
+	{
+		PORTB &= 0xBF; // (ROUGE)
+		PORTB |= 0x02; // (BLEU)
+		PORTB |= 0x20; // (VERT)
+	}
+	else
+	{
+		PORTB |= 0x40; // (ROUGE)
+		PORTB |= 0x02; // (BLEU)
+		PORTB |= 0x20; // (VERT)
+	}
 }
 
 //FONCTION D'INITIALISATION
@@ -603,6 +718,10 @@ void ADC_setup(void)
 // INIT PORT LEDs
 void LED_setup(void)
 {
+	///////////////////////////////////////////
+	// POUR PORT LED PH
+	///////////////////////////////////////////
+	
 	// init ports des LEDs (port B)
 	DDRB = 0x00;
 		
@@ -615,8 +734,10 @@ void LED_setup(void)
 	PORTB = 0xFF; //LEDs a off
 	
 	///////////////////////////////////////////
-	// AUTRES PORTS A FAIRE POUR STRIPE DE LED 2
+	// POUR PORT LED PH
 	///////////////////////////////////////////
+	
+	// A FAIRE **
 }
 
 // FONCTION QUI EFFECTUE LA LECTURE DE LADC
@@ -638,16 +759,6 @@ float lecture_ADC(void)
 			
 	return volt;
 }
-
-/*
-// FONCTION UTILISÉ POUR PRINF
-void printf_func(char* buf)
-{
-	char *ptr = buf;
-	while( *ptr != (char)0 )
-	Ecris_UART( *ptr++ );
-}
-*/
 
 // Lis uart pour scanf
 char Lis_UART(void)
@@ -699,18 +810,6 @@ void start_ADC()
 {
 	ADCSRA |= 0b01000000;
 }
-
-/*
-// NE SAIS PAS CE QUE CA FAIT: A VOIR ***
-void wdt_disable(void) // cest utile ??
-{
-	// Disable watchdog timer
-	asm("wdr");
-	MCUSR = 0;
-	WDTCSR |= (1 << WDCE) | (1 << WDE);
-	WDTCSR = 0x00;
-}
-*/
 
 
 
