@@ -66,6 +66,12 @@ void init_UART(void);
 void SYS_Init(void);
 int testeu = 45;
 
+uint8_t testBuffer2[MessageLength];
+Alerte testAlerte2 = BAS;
+uint8_t ackTest2 = 1;
+bool crcOK;
+char *ptr;
+
 /*- Variables --------------------------------------------------------------*/
 // Put your variables here
 uint8_t receivedWireless;	//cette variable deviendra 1 lorsqu'un nouveau paquet aura été recu via wireless (et copié dans "PHY_DataInd_t ind"
@@ -101,11 +107,9 @@ bool genMessage(Alerte alerte, char *message, uint8_t ack)
 	memcpy(message+(MessageLength-1), &crcResult, sizeof(crcResult));
 
 
-	uint8_t crcResult2 = crc_8((unsigned char*)message, MessageLength);
+	//uint8_t crcResult2 = crc_8((unsigned char*)message, MessageLength);
 
-
-
-	Ecris_UART("test verif du crc: %i", crcResult2);
+	Ecris_UART("Message sent");
 
 	return true; //a changer
 	
@@ -158,25 +162,30 @@ static void APP_TaskHandler(void)
 
 	  if(receivedUart == 'a')	//est-ce que le caractere recu est 'a'? 
 		{
-		uint8_t demonstration_string[MessageLength] = "123456789A"; //data packet bidon
+		//uint8_t demonstration_string[MessageLength] = "123456789A"; //data packet bidon
 
 		// variables pour test
-		char testBuffer[MessageLength];
+		uint8_t testBuffer[MessageLength];
 		Alerte testAlerte = HAUT;
 		uint8_t ackTest = 2;
-
-		genMessage(testAlerte, testBuffer, ackTest);
 		
-		char testBuffer2[MessageLength];
+
+		//Bufftest[128] = "123456789A";
+		//Ecris_Wireless(Bufftest, 10);
+		
+		genMessage(testAlerte, testBuffer, ackTest);
+		Ecris_Wireless(testBuffer, 127);
+		
+		/*char testBuffer2[MessageLength];
 		Alerte testAlerte2 = BAS;
 		uint8_t ackTest2 = 1;
 		bool crcOK;
 		
-		AdressOK = false;
+		AdressOK = false;*/
 		
-		AdressOK = decodeMessage(&testAlerte2, testBuffer, &ackTest2, &crcOK);
+		//AdressOK = decodeMessage(&testAlerte2, testBuffer, &ackTest2, &crcOK);
 
-		Ecris_Wireless(demonstration_string, 10); //envoie le data packet; nombre d'éléments utiles du paquet à envoyer
+		//Ecris_Wireless(demonstration_string, 10); //envoie le data packet; nombre d'éléments utiles du paquet à envoyer
 		}
   }
 
@@ -190,7 +199,28 @@ static void APP_TaskHandler(void)
 //si quelqu'un a une méthode plus propre / mieux intégrée à proposer pour faire des "printf" avec notre fonction Ecris_UART, je veux bien l'entendre! 
 	
 	
-	Ecris_UART("\n\rnew trame! size: %d, RSSI: %ddBm\n\r contenu: %s\n\r", ind.size, ind.rssi, ind.data);
+	bool AdresseCorrect;
+	
+	char i = 0;
+	/*
+	ptr = ind.data;
+	while (i< ind.size)
+	{
+		testBuffer2[i] = *ptr++;
+		i++;
+	}
+	*/
+	
+	sprintf(testBuffer2, "%s" , ind.data);
+	
+	AdresseCorrect = decodeMessage(&testAlerte2, testBuffer2, &ackTest2, &crcOK);
+	
+	//Ecris_UART("\n\rnew trame! size: %d, RSSI: %ddBm\n\r Data: %s\n\r", ind.size, ind.rssi, testBuffer2);
+	
+	if(AdresseCorrect)
+	{
+		Ecris_UART("\n\rnew trame! size: %d, RSSI: %ddBm\n\r alerte: %d\n\r Ack: %d\n\r CRC :%d", ind.size, ind.rssi, testAlerte2,ackTest2, crcOK);
+	}
 	
 	receivedWireless = 0; 
 	
@@ -211,7 +241,6 @@ int main(void)
     APP_TaskHandler(); //l'application principale roule ici
   }
 }
-
 
 
 
