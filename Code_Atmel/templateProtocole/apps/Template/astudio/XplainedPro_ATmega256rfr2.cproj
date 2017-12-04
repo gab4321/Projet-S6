@@ -230,9 +230,6 @@
     <Compile Include="crc8.c">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="header.h">
-      <SubType>compile</SubType>
-    </Compile>
     <Compile Include="template.h">
       <SubType>compile</SubType>
     </Compile>

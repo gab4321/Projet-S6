@@ -10,7 +10,7 @@
 #define TEMPLATE_H_
 
 #define IDCode "uWLmpJ9elFpnWre3MwBHzDAUtjWSYoa4O5SpdDtNGr9cneVomBA5B24qZJHA9phhcm7mMKBxizZjtNoiNLIciWRyCoUNfW0c78FM" 
-#define MessageLength 127
+#define MessageLength 103
 
 typedef enum Alerte Alerte;
 enum Alerte

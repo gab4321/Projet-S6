@@ -29,7 +29,7 @@ Common symbol       size              file
 ptr                 0x2               template.o
 AdressOK            0x1               template.o
 ind                 0x5               template.o
-testBuffer2         0x7f              template.o
+testBuffer2         0x67              template.o
 receivedWireless    0x1               template.o
 crcOK               0x1               template.o
 
@@ -623,7 +623,7 @@ END GROUP
                 0x008003c0                _edata = .
                 0x008003c0                PROVIDE (__data_end, .)
 
-.bss            0x008003c0      0x10f
+.bss            0x008003c0       0xf7
                 0x008003c0                PROVIDE (__bss_start, .)
  *(.bss)
  *(.bss*)
@@ -639,22 +639,22 @@ END GROUP
                 0x00800444        0x2 template.o
                 0x00800444                testAlerte2
  *(COMMON)
- COMMON         0x00800446       0x89 template.o
+ COMMON         0x00800446       0x71 template.o
                 0x00800446                ptr
                 0x00800448                AdressOK
                 0x00800449                ind
                 0x0080044e                testBuffer2
-                0x008004cd                receivedWireless
-                0x008004ce                crcOK
-                0x008004cf                PROVIDE (__bss_end, .)
+                0x008004b5                receivedWireless
+                0x008004b6                crcOK
+                0x008004b7                PROVIDE (__bss_end, .)
                 0x00000bae                __data_load_start = LOADADDR (.data)
                 0x00000d6e                __data_load_end = (__data_load_start + SIZEOF (.data))
 
-.noinit         0x008004cf        0x0
+.noinit         0x008004b7        0x0
                 [!provide]                PROVIDE (__noinit_start, .)
  *(.noinit*)
                 [!provide]                PROVIDE (__noinit_end, .)
-                0x008004cf                _end = .
+                0x008004b7                _end = .
                 [!provide]                PROVIDE (__heap_start, .)
 
 .eeprom         0x00810000        0x0
@@ -758,11 +758,11 @@ END GROUP
  .debug_line    0x000004b3      0x550 template.o
  .debug_line    0x00000a03      0x16b crc8.o
 
-.debug_frame    0x00000000      0x1d0
+.debug_frame    0x00000000      0x1cc
  *(.debug_frame)
  .debug_frame   0x00000000       0xb4 stack/phy/atmegarfr2/src/phy.o
- .debug_frame   0x000000b4       0xe8 template.o
- .debug_frame   0x0000019c       0x34 crc8.o
+ .debug_frame   0x000000b4       0xe4 template.o
+ .debug_frame   0x00000198       0x34 crc8.o
 
 .debug_str      0x00000000    0x1118c
  *(.debug_str)

@@ -174,7 +174,7 @@ static void APP_TaskHandler(void)
 		//Ecris_Wireless(Bufftest, 10);
 		
 		genMessage(testAlerte, testBuffer, ackTest);
-		Ecris_Wireless(testBuffer, 127);
+		Ecris_Wireless(testBuffer, MessageLength);
 		
 		/*char testBuffer2[MessageLength];
 		Alerte testAlerte2 = BAS;
