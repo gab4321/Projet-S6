@@ -38,6 +38,7 @@ void SYS_Init(void);
 void ADC_setup(void);
 void LED_setup(void);
 void Timer_Init(void);
+void LED_Toggle(void);
 //void printf_func(char* buf);
 
 void ledAlerte(EtatAlerteGlobal etatalerte);
@@ -105,10 +106,12 @@ volatile int compteur_color = 0;
 volatile int compteurPoll = 0;
 volatile int compteurTimeOutEmission1 = 0;
 volatile int compteurTimeOutEmission2 = 0;
+volatile int compteurLEDAlerte = 0;
 
 volatile int intervalMesurePh = 2; // secondes
 volatile uint8_t intervalAttenteAlerte = 30; // secondes
 volatile uint8_t intervalAttenteEmission = 30; // secondes
+volatile int intervalLEDAlerte = 5000;
 
 volatile bool flagPh = false;
 volatile bool flag_ADC = false;
@@ -211,6 +214,7 @@ ISR(TIMER3_COMPA_vect) {
 		flagTimeOutAck2 = false;
 	}
 	
+	// compteur qui part lalerte haute dans la condition ou la AlerteSonde1 = HAUT et AlerteSonde2 = BAS (si ca fait trop longtemps que la SONDE 1 attend)
 	if(flagConfSonde1)
 	{
 		if(compteurTimeOutEmission1++ > TimeOutEmission1)
@@ -224,6 +228,7 @@ ISR(TIMER3_COMPA_vect) {
 		compteurTimeOutEmission1 = 0;
 	}
 	
+	// compteur qui part lalerte haute dans la condition ou la AlerteSonde1 = BAS et AlerteSonde2 = HAUT (si ca fait trop longtemps que la SONDE 2 attend)
 	if(flagConfSonde2)
 	{
 		if(compteurTimeOutEmission2++ > TimeOutEmission2)
@@ -235,6 +240,12 @@ ISR(TIMER3_COMPA_vect) {
 	else
 	{
 		compteurTimeOutEmission2 = 0;
+	}
+	
+	if(compteurLEDAlerte++ >= intervalLEDAlerte)
+	{
+		compteurLEDAlerte = 0;
+		LED_Toggle();
 	}
 	
 }
@@ -264,6 +275,11 @@ static void APP_TaskHandler(void)
 		flagPh = false;
 		
 		start_ADC();
+		
+		// MESSAGES DE DEBUG 
+		//////////////////////////////////////////////////////////
+		//////////////////////////////////////////////////////////
+		Ecris_UART("\nNiveau alerte global:%d\n", etatAlerteGlobal); // debug
 	}
 
 	// mesure ADC terminée: on calcul la valeur du pH et on update letat de la presente sonde
@@ -307,6 +323,8 @@ static void APP_TaskHandler(void)
 			
 			niveauAlerte1 = BAS; 		
 		}
+		
+		Ecris_UART("\nLflagpoll %d\n", flagPoll); // debug
 	}
 	
 	// Si on ne connait pas letat de la sonde 2 il faut lui demander
@@ -496,7 +514,7 @@ static void APP_TaskHandler(void)
 		isCountingAttenteSonde2 = false;
 		flagTimeOutEmission2 = false;		
 	}
-	////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////	
 		
 }
 
@@ -519,6 +537,11 @@ int main(void)
 ////////////////////////////////////////////////////////////////////////////////
 // FONCTIONS
 ////////////////////////////////////////////////////////////////////////////////
+
+// 
+void LED_Toggle(void) {
+	PORTD ^= 0x01; // change letat de la led branché sur la pin PD0
+}
 
 // analyse le message recu wireless et sort le tableau recu en eliminant lentete / gestion derreurs
 bool recoieMessage(EtatAlerte message, AckType acktype, bool CRC_confirm)
@@ -553,31 +576,23 @@ void ledAlerte(EtatAlerteGlobal etatalerteglobal)
 	// A TITRE DEXEMPLE: POSSIBILITÉ DE CODER DES LUMIERE QUI FLACHENT OU CODE DE COULEUR
 	///////////////////////////////////////////////////////////////////////////////////////
 	
-	// sur port B
+	// sur port D
 	
 	if(etatalerteglobal == ATTENTE) // allume leds vert et eteint les autres
 	{
-		PORTB |= 0x40; // (ROUGE)
-		PORTB |= 0x02; // (BLEU)
-		PORTB &= 0xDF; // (VERT)		
+		intervalLEDAlerte = 10000; // toggle a chaque 1 sec
 	}
 	else if(etatalerteglobal == AVERTISSEMENT) // allume leds bleu et eteint les autres
 	{
-		PORTB |= 0x40; // (ROUGE)
-		PORTB &= 0xFD; // (BLEU)
-		PORTB |= 0x20; // (VERT)		
+		intervalLEDAlerte = 5000; // toggle a chaque 0.5 sec	
 	}
 	else if(etatalerteglobal == EMISSION) // allume leds rouge et eteint les autres
 	{
-		PORTB &= 0xBF; // (ROUGE)
-		PORTB |= 0x02; // (BLEU)
-		PORTB |= 0x20; // (VERT)
+		intervalLEDAlerte = 2000; // toggle a chaque 0.2 sec
 	}
 	else
 	{
-		PORTB |= 0x40; // (ROUGE)
-		PORTB |= 0x02; // (BLEU)
-		PORTB |= 0x20; // (VERT)		
+	
 	}
 }
 
@@ -587,10 +602,6 @@ void ledPH(float valeurPh)
 	///////////////////////////////////////////////////////////////////////////////////////
 	// A TITRE DEXEMPLE: POSSIBILITÉ DE CODER DES LUMIERE QUI FLACHENT OU CODE DE COULEUR
 	///////////////////////////////////////////////////////////////////////////////////////
-	
-	///////////////////////////
-	// sur port A DETERMINER
-	///////////////////////////
 		
 	if((valeurPh < 7.0) && (valeurPh > 6.0)) // allume leds vert et eteint les autres
 	{
@@ -723,15 +734,25 @@ void LED_setup(void)
 	///////////////////////////////////////////
 	
 	// init ports des LEDs (port B)
-	DDRB = 0x00;
+	DDRB = 0x00; // initialisation
+	
+	DDRD = 0x00; // initialisation
 		
-	DDRB |= 0x40; //PB6 output (rouge)
+	DDRB |= 0x40; //PB6 output (rouge) (pour ph)
 		
-	DDRB |= 0x20; //PB5 output (vert)
+	DDRB |= 0x20; //PB5 output (vert) (pour ph)
 		
-	DDRB |= 0x02; //PB1 output (bleu)
+	DDRB |= 0x02; //PB1 output (bleu) (pour ph)
+	
+	DDRD |= 0x01; //PD0 output (rouge) (pour niveau alerte)
 		
-	PORTB = 0xFF; //LEDs a off
+	//PORTB = 0xFF; //LEDs a off
+	PORTB = 0x00;	//LEDs a off
+	
+	//PORTD = 0xFF; //LEDs a off
+	PORTD = 0x00;	//LEDs a off
+	
+	//
 	
 	///////////////////////////////////////////
 	// POUR PORT LED PH
