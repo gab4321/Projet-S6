@@ -10,7 +10,7 @@
 #define HEADER_H_
 
 #define IDCode "uWLmpJ9elFpnWre3MwBHzDAUtjWSYoa4O5SpdDtNGr9cneVomBA5B24qZJHA9phhcm7mMKBxizZjtNoiNLIciWRyCoUNfW0c78FM" 
-#define MessageLength 110
+#define MessageLength 127
 
 typedef enum Alerte Alerte;
 enum Alerte

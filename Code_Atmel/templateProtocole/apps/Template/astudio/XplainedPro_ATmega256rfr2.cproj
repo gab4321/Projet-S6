@@ -74,21 +74,33 @@
           <JtagDevicesAfter>0</JtagDevicesAfter>
           <JtagInstrBitsBefore>0</JtagInstrBitsBefore>
           <JtagInstrBitsAfter>0</JtagInstrBitsAfter>
-          <JtagSelectedDeviceIndexInChain>
-          </JtagSelectedDeviceIndexInChain>
+          <JtagSelectedDeviceIndexInChain>0</JtagSelectedDeviceIndexInChain>
           <JtagDaisyChainDevices>
           </JtagDaisyChainDevices>
         </InterfaceProperties>
         <InterfaceName>JTAG</InterfaceName>
       </ToolOptions>
       <ToolType>com.atmel.avrdbg.tool.edbg</ToolType>
-      <ToolNumber>ATML1784031800000928</ToolNumber>
+      <ToolNumber>ATML1784031800001078</ToolNumber>
       <ToolName>EDBG</ToolName>
     </com_atmel_avrdbg_tool_edbg>
     <preserveEEPROM>true</preserveEEPROM>
-    <avrtoolserialnumber>ATML1784031800000928</avrtoolserialnumber>
+    <avrtoolserialnumber>ATML1784031800001078</avrtoolserialnumber>
     <avrdeviceexpectedsignature>0x1EA802</avrdeviceexpectedsignature>
     <avrtoolinterfaceclock>220000</avrtoolinterfaceclock>
+    <ResetRule>0</ResetRule>
+    <EraseKey />
+    <custom>
+      <ToolOptions xmlns="">
+        <InterfaceProperties>
+        </InterfaceProperties>
+        <InterfaceName>JTAG</InterfaceName>
+      </ToolOptions>
+      <ToolType xmlns="">custom</ToolType>
+      <ToolNumber xmlns="">
+      </ToolNumber>
+      <ToolName xmlns="">Custom Programming Tool</ToolName>
+    </custom>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <OutputFileName>Template</OutputFileName>
@@ -219,6 +231,9 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="header.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="template.h">
       <SubType>compile</SubType>
     </Compile>
   </ItemGroup>

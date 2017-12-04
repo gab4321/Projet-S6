@@ -49,7 +49,7 @@
 #include "phy.h"
 #include <stdio.h>
 #include <stdarg.h>
-#include "header.h"
+#include "astudio/template.h"
 #include <string.h>
 #include "libcrc-2.0/include/checksum.h"
 /*- Definitions ------------------------------------------------------------*/
@@ -104,8 +104,8 @@ bool genMessage(Alerte alerte, char *message, uint8_t ack)
 	uint8_t crcResult = crc_8((unsigned char*)message, MessageLength-1);
 
 	//memcpy(message+(sizeof(message)- sizeof(crcResult)), &crcResult, sizeof(crcResult));
-	memcpy(message+(MessageLength-1), &crcResult, sizeof(crcResult));
-
+	 memcpy(message+(MessageLength-1), &crcResult, sizeof(crcResult));
+	//memcpy(message+(126), &crcResult, 1);
 
 	//uint8_t crcResult2 = crc_8((unsigned char*)message, MessageLength);
 
