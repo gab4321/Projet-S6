@@ -349,6 +349,8 @@ static void APP_TaskHandler(void)
 			{
 				isWaitingAck2 = false;
 				
+				Ecris_UART("\n\rACK2 recieved end transmission\n\r"); // debug
+				
 				receivedWireless = 0; // la reception est terminée
 			}
 			if (CRC_confirm && receptAckType == POLL)

@@ -824,7 +824,7 @@ END GROUP
  *(.fini0)
                 0x00001e42                _etext = .
 
-.data           0x00800200      0x3c8 load address 0x00001e42
+.data           0x00800200      0x46a load address 0x00001e42
                 0x00800200                PROVIDE (__data_start, .)
  *(.data)
  *(.data*)
@@ -864,117 +864,117 @@ END GROUP
  *(.rodata)
  *(.rodata*)
  .rodata.str1.1
-                0x00800216      0x2b2 template.o
+                0x00800216      0x354 template.o
  .rodata.sht75_crc_table
-                0x008004c8      0x100 crc8.o
+                0x0080056a      0x100 crc8.o
  *(.gnu.linkonce.r*)
-                0x008005c8                . = ALIGN (0x2)
-                0x008005c8                _edata = .
-                0x008005c8                PROVIDE (__data_end, .)
+                0x0080066a                . = ALIGN (0x2)
+                0x0080066a                _edata = .
+                0x0080066a                PROVIDE (__data_end, .)
 
-.bss            0x008005c8      0x195
-                0x008005c8                PROVIDE (__bss_start, .)
+.bss            0x0080066a      0x195
+                0x0080066a                PROVIDE (__bss_start, .)
  *(.bss)
  *(.bss*)
  .bss.phyRxBuffer
-                0x008005c8       0x80 stack/phy/atmegarfr2/src/phy.o
- .bss.phyState  0x00800648        0x1 stack/phy/atmegarfr2/src/phy.o
+                0x0080066a       0x80 stack/phy/atmegarfr2/src/phy.o
+ .bss.phyState  0x008006ea        0x1 stack/phy/atmegarfr2/src/phy.o
  .bss.isWaitingAck2
-                0x00800649        0x1 template.o
-                0x00800649                isWaitingAck2
+                0x008006eb        0x1 template.o
+                0x008006eb                isWaitingAck2
  .bss.isWaitingAck1
-                0x0080064a        0x1 template.o
-                0x0080064a                isWaitingAck1
+                0x008006ec        0x1 template.o
+                0x008006ec                isWaitingAck1
  .bss.CRC_confirm
-                0x0080064b        0x1 template.o
-                0x0080064b                CRC_confirm
+                0x008006ed        0x1 template.o
+                0x008006ed                CRC_confirm
  .bss.perteConnexion
-                0x0080064c        0x1 template.o
-                0x0080064c                perteConnexion
+                0x008006ee        0x1 template.o
+                0x008006ee                perteConnexion
  .bss.compteurPerteConnexion
-                0x0080064d        0x1 template.o
-                0x0080064d                compteurPerteConnexion
+                0x008006ef        0x1 template.o
+                0x008006ef                compteurPerteConnexion
  .bss.valeurADC
-                0x0080064e        0x4 template.o
-                0x0080064e                valeurADC
+                0x008006f0        0x4 template.o
+                0x008006f0                valeurADC
  .bss.etatAlerteGlobal
-                0x00800652        0x2 template.o
-                0x00800652                etatAlerteGlobal
+                0x008006f4        0x2 template.o
+                0x008006f4                etatAlerteGlobal
  .bss.niveauAlerte1
-                0x00800654        0x2 template.o
-                0x00800654                niveauAlerte1
+                0x008006f6        0x2 template.o
+                0x008006f6                niveauAlerte1
  .bss.flagISRTimeOutComm1
-                0x00800656        0x1 template.o
-                0x00800656                flagISRTimeOutComm1
+                0x008006f8        0x1 template.o
+                0x008006f8                flagISRTimeOutComm1
  .bss.flagTimeOutEmission2
-                0x00800657        0x1 template.o
-                0x00800657                flagTimeOutEmission2
+                0x008006f9        0x1 template.o
+                0x008006f9                flagTimeOutEmission2
  .bss.flagTimeOutEmission1
-                0x00800658        0x1 template.o
-                0x00800658                flagTimeOutEmission1
+                0x008006fa        0x1 template.o
+                0x008006fa                flagTimeOutEmission1
  .bss.isCountingAttenteSonde2
-                0x00800659        0x1 template.o
-                0x00800659                isCountingAttenteSonde2
+                0x008006fb        0x1 template.o
+                0x008006fb                isCountingAttenteSonde2
  .bss.isCountingAttenteSonde1
-                0x0080065a        0x1 template.o
-                0x0080065a                isCountingAttenteSonde1
+                0x008006fc        0x1 template.o
+                0x008006fc                isCountingAttenteSonde1
  .bss.flagConfSonde2
-                0x0080065b        0x1 template.o
-                0x0080065b                flagConfSonde2
+                0x008006fd        0x1 template.o
+                0x008006fd                flagConfSonde2
  .bss.flagConfSonde1
-                0x0080065c        0x1 template.o
-                0x0080065c                flagConfSonde1
+                0x008006fe        0x1 template.o
+                0x008006fe                flagConfSonde1
  .bss.flagTimeOutAck2
-                0x0080065d        0x1 template.o
-                0x0080065d                flagTimeOutAck2
+                0x008006ff        0x1 template.o
+                0x008006ff                flagTimeOutAck2
  .bss.flagTimeOutAck1
-                0x0080065e        0x1 template.o
-                0x0080065e                flagTimeOutAck1
+                0x00800700        0x1 template.o
+                0x00800700                flagTimeOutAck1
  .bss.flagAttenteAck2
-                0x0080065f        0x1 template.o
-                0x0080065f                flagAttenteAck2
- .bss.flagPoll  0x00800660        0x1 template.o
-                0x00800660                flagPoll
- .bss.flag_ADC  0x00800661        0x1 template.o
-                0x00800661                flag_ADC
- .bss.flagPh    0x00800662        0x1 template.o
-                0x00800662                flagPh
+                0x00800701        0x1 template.o
+                0x00800701                flagAttenteAck2
+ .bss.flagPoll  0x00800702        0x1 template.o
+                0x00800702                flagPoll
+ .bss.flag_ADC  0x00800703        0x1 template.o
+                0x00800703                flag_ADC
+ .bss.flagPh    0x00800704        0x1 template.o
+                0x00800704                flagPh
  .bss.flagToggleLED
-                0x00800663        0x1 template.o
-                0x00800663                flagToggleLED
+                0x00800705        0x1 template.o
+                0x00800705                flagToggleLED
  .bss.compteurLEDAlerte
-                0x00800664        0x2 template.o
-                0x00800664                compteurLEDAlerte
+                0x00800706        0x2 template.o
+                0x00800706                compteurLEDAlerte
  .bss.compteurTimeOutEmission2
-                0x00800666        0x2 template.o
-                0x00800666                compteurTimeOutEmission2
+                0x00800708        0x2 template.o
+                0x00800708                compteurTimeOutEmission2
  .bss.compteurTimeOutEmission1
-                0x00800668        0x2 template.o
-                0x00800668                compteurTimeOutEmission1
+                0x0080070a        0x2 template.o
+                0x0080070a                compteurTimeOutEmission1
  .bss.compteurAttenteAck2
-                0x0080066a        0x2 template.o
-                0x0080066a                compteurAttenteAck2
+                0x0080070c        0x2 template.o
+                0x0080070c                compteurAttenteAck2
  .bss.compteurAttenteAck1
-                0x0080066c        0x2 template.o
-                0x0080066c                compteurAttenteAck1
+                0x0080070e        0x2 template.o
+                0x0080070e                compteurAttenteAck1
  .bss.compteurMesurePh
-                0x0080066e        0x2 template.o
-                0x0080066e                compteurMesurePh
+                0x00800710        0x2 template.o
+                0x00800710                compteurMesurePh
  *(COMMON)
- COMMON         0x00800670       0xed template.o
-                0x00800670                ind
-                0x00800675                messageWireless
-                0x008006f5                receivedWireless
-                0x008006f6                messageBuffer
-                0x0080075d                PROVIDE (__bss_end, .)
+ COMMON         0x00800712       0xed template.o
+                0x00800712                ind
+                0x00800717                messageWireless
+                0x00800797                receivedWireless
+                0x00800798                messageBuffer
+                0x008007ff                PROVIDE (__bss_end, .)
                 0x00001e42                __data_load_start = LOADADDR (.data)
-                0x0000220a                __data_load_end = (__data_load_start + SIZEOF (.data))
+                0x000022ac                __data_load_end = (__data_load_start + SIZEOF (.data))
 
-.noinit         0x0080075d        0x0
+.noinit         0x008007ff        0x0
                 [!provide]                PROVIDE (__noinit_start, .)
  *(.noinit*)
                 [!provide]                PROVIDE (__noinit_end, .)
-                0x0080075d                _end = .
+                0x008007ff                _end = .
                 [!provide]                PROVIDE (__heap_start, .)
 
 .eeprom         0x00810000        0x0
