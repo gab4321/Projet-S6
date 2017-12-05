@@ -247,8 +247,8 @@ static void APP_TaskHandler(void)
 		
 		
 		//Ecris_UART("\NE CONNAIT PAS LETAT DE LA SONDE 2: ON LUI DEMANDE\n\r"); // debug
-		Ecris_UART("\n\riswaitingAck1 = %d\n\r", isWaitingAck1); // debug
-		Ecris_UART("\n\riswaitingAck2 = %d\n\r", isWaitingAck2); // debug
+		//Ecris_UART("\n\riswaitingAck1 = %d\n\r", isWaitingAck1); // debug
+		//Ecris_UART("\n\riswaitingAck2 = %d\n\r", isWaitingAck2); // debug
 		
 		isWaitingAck1 = 1; // on attend un ack1 de la sonde 2
 		
@@ -304,7 +304,7 @@ static void APP_TaskHandler(void)
 	// si un paquet est recu sur le wireless
 	if(receivedWireless == 1)
 	{
-		Ecris_UART("\n\rReception dun message wireless\n\r"); // debug
+		//Ecris_UART("\n\rReception dun message wireless\n\r"); // debug
 		
 		if(recoieMessage(&tempNiveauAlerte2, &receptAckType, &CRC_confirm))
 		{
