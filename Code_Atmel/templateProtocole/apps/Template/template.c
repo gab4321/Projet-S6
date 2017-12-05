@@ -225,7 +225,7 @@ static void APP_TaskHandler(void)
 			
 			niveauAlerte1 = HAUT;
 		}
-		else if(valeurPh > seuilPh)
+		else if(valeurPh >= seuilPh)
 		{
 			//Ecris_UART("\n\rdetection pH OK: Alerte BAS\n\r"); // debug
 			
@@ -498,7 +498,7 @@ void ledPH(float valeurPh)
 	// A TITRE DEXEMPLE: POSSIBILITÉ DE CODER DES LUMIERE QUI FLACHENT OU CODE DE COULEUR
 	///////////////////////////////////////////////////////////////////////////////////////
 	
-	if((valeurPh < 7.0) && (valeurPh > 6.0)) // allume leds vert et eteint les autres
+	if((valeurPh <= 7.0) && (valeurPh >= 4.0)) // allume leds vert et eteint les autres
 	{
 		PORTB &= 0xBF; // (ROUGE) PORTB |= 0x40; // (ROUGE)
 		PORTB &= 0xFD; // (BLEU)  PORTB |= 0x02; // (BLEU)
@@ -510,7 +510,7 @@ void ledPH(float valeurPh)
 		PORTB |= 0x02; // (BLEU)  PORTB &= 0xFD; // (BLEU)
 		PORTB &= 0xDF; // (VERT)  PORTB |= 0x20; // (VERT)
 	}
-	else if(valeurPh < 6.0) // allume leds rouge et eteint les autres
+	else if(valeurPh < 4.0) // allume leds rouge et eteint les autres
 	{
 		PORTB |= 0x40; // (ROUGE) PORTB &= 0xBF; // (ROUGE)
 		PORTB &= 0xFD; // (BLEU)  PORTB |= 0x02; // (BLEU)
