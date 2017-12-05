@@ -466,15 +466,15 @@ void ledAlerte(EtatAlerteGlobal etatalerteglobal)
 	
 	if(etatalerteglobal == ATTENTE) // allume leds vert et eteint les autres
 	{
-		intervalLEDAlerte = 65000; // toggle a chaque 1 sec
+		intervalLEDAlerte = 10000; // toggle a chaque 1 sec
 	}
 	else if(etatalerteglobal == AVERTISSEMENT) // allume leds bleu et eteint les autres
 	{
-		intervalLEDAlerte = 10000; // toggle a chaque 0.5 sec	
+		intervalLEDAlerte = 5000; // toggle a chaque 0.5 sec	
 	}
 	else if(etatalerteglobal == EMISSION) // allume leds rouge et eteint les autres
 	{
-		intervalLEDAlerte = 3500; // toggle a chaque 0.2 sec
+		intervalLEDAlerte = 2000; // toggle a chaque 0.2 sec
 	}
 	else
 	{
