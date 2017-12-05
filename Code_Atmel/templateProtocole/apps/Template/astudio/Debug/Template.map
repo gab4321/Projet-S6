@@ -62,7 +62,6 @@ Common symbol       size              file
 
 ind                 0x5               template.o
 messageWireless     0x80              template.o
-cunt                0x2               template.o
 receivedWireless    0x1               template.o
 messageBuffer       0x67              template.o
 
@@ -875,7 +874,7 @@ END GROUP
                 0x0080068e                _edata = .
                 0x0080068e                PROVIDE (__data_end, .)
 
-.bss            0x0080068e      0x196
+.bss            0x0080068e      0x194
                 0x0080068e                PROVIDE (__bss_start, .)
  *(.bss)
  *(.bss*)
@@ -961,21 +960,20 @@ END GROUP
                 0x00800733        0x2 template.o
                 0x00800733                compteurMesurePh
  *(COMMON)
- COMMON         0x00800735       0xef template.o
+ COMMON         0x00800735       0xed template.o
                 0x00800735                ind
                 0x0080073a                messageWireless
-                0x008007ba                cunt
-                0x008007bc                receivedWireless
-                0x008007bd                messageBuffer
-                0x00800824                PROVIDE (__bss_end, .)
+                0x008007ba                receivedWireless
+                0x008007bb                messageBuffer
+                0x00800822                PROVIDE (__bss_end, .)
                 0x00001e58                __data_load_start = LOADADDR (.data)
                 0x000022e6                __data_load_end = (__data_load_start + SIZEOF (.data))
 
-.noinit         0x00800824        0x0
+.noinit         0x00800822        0x0
                 [!provide]                PROVIDE (__noinit_start, .)
  *(.noinit*)
                 [!provide]                PROVIDE (__noinit_end, .)
-                0x00800824                _end = .
+                0x00800822                _end = .
                 [!provide]                PROVIDE (__heap_start, .)
 
 .eeprom         0x00810000        0x0
@@ -1058,12 +1056,12 @@ END GROUP
 .debug_pubnames
  *(.debug_pubnames)
 
-.debug_info     0x00000000     0x2908
+.debug_info     0x00000000     0x28f6
  *(.debug_info .gnu.linkonce.wi.*)
  .debug_info    0x00000000     0x13e6 c:/program files (x86)/atmel/studio/7.0/toolchain/avr8/avr8-gnu-toolchain/bin/../lib/gcc/avr/5.4.0/../../../../avr/lib/avr6/crtatmega256rfr2.o
  .debug_info    0x000013e6      0x6bd stack/phy/atmegarfr2/src/phy.o
- .debug_info    0x00001aa3      0xd0e template.o
- .debug_info    0x000027b1      0x157 crc8.o
+ .debug_info    0x00001aa3      0xcfc template.o
+ .debug_info    0x0000279f      0x157 crc8.o
 
 .debug_abbrev   0x00000000     0x19de
  *(.debug_abbrev)
@@ -1085,14 +1083,14 @@ END GROUP
  .debug_frame   0x000000b4      0x32c template.o
  .debug_frame   0x000003e0       0x34 crc8.o
 
-.debug_str      0x00000000    0x1198a
+.debug_str      0x00000000    0x11985
  *(.debug_str)
  .debug_str     0x00000000      0x7f7 c:/program files (x86)/atmel/studio/7.0/toolchain/avr8/avr8-gnu-toolchain/bin/../lib/gcc/avr/5.4.0/../../../../avr/lib/avr6/crtatmega256rfr2.o
  .debug_str     0x000007f7     0xf90a stack/phy/atmegarfr2/src/phy.o
                                0xfa63 (size before relaxing)
- .debug_str     0x00010101     0x184c template.o
-                               0xfe63 (size before relaxing)
- .debug_str     0x0001194d       0x3d crc8.o
+ .debug_str     0x00010101     0x1847 template.o
+                               0xfe5e (size before relaxing)
+ .debug_str     0x00011948       0x3d crc8.o
                                0x38ca (size before relaxing)
 
 .debug_loc      0x00000000      0xf3a
