@@ -298,7 +298,7 @@ static void APP_TaskHandler(void)
 		// MESSAGES DE DEBUG 
 		//////////////////////////////////////////////////////////
 		//////////////////////////////////////////////////////////
-		Ecris_UART("\nNiveau alerte global:%d\n", etatAlerteGlobal); // debug
+		Ecris_UART("\n\rNiveau alerte global:%d\n\r", etatAlerteGlobal); // debug
 	}
 
 	// mesure ADC terminée: on calcul la valeur du pH et on update letat de la presente sonde
@@ -310,40 +310,40 @@ static void APP_TaskHandler(void)
 		
 		valeurPh = conv_PH(valeurADC); 
 		
-		Ecris_UART("\nTension ADC: %f V\n",valeurADC);  // debug
-		Ecris_UART("\nValeur pH: %f \n",valeurPh);		// debug
+		Ecris_UART("\n\rTension ADC: %f V\n\r",valeurADC);  // debug
+		Ecris_UART("\n\rValeur pH: %f \n\r",valeurPh);		// debug
 		
 		// verifie le niveau de PH
 		if(valeurPh == PH_ERROR_CODE)
 		{
-			Ecris_UART("\nATTENTION: Valeur du pH non valide\n"); // debug
+			Ecris_UART("\n\rATTENTION: Valeur du pH non valide\n\r"); // debug
 		}
 		else if(valeurPh < seuilPh)
 		{
-			//Ecris_UART("\ndetection pH trop faible: Alerte HAUT\n"); // debug
+			//Ecris_UART("\n\rdetection pH trop faible: Alerte HAUT\n\r"); // debug
 			
 			if(niveauAlerte1 == BAS) // si changement detat on envoie un poll a lautre sonde
 			{
 				flagPoll = true;
-				Ecris_UART("\nLe niveau dalerte sonde 1 passe de BAS a HAUT\n"); // debug
+				Ecris_UART("\n\rLe niveau dalerte sonde 1 passe de BAS a HAUT\n\r"); // debug
 			}
 			
 			niveauAlerte1 = HAUT; 
 		}	
 		else if(valeurPh > seuilPh)
 		{
-			//Ecris_UART("\ndetection pH OK: Alerte BAS\n"); // debug		
+			//Ecris_UART("\n\rdetection pH OK: Alerte BAS\n\r"); // debug		
 			
 			if(niveauAlerte1 == HAUT) // si changement detat on envoie un poll a lautre sonde
 			{
 				flagPoll = true;
-				Ecris_UART("\nLe niveau dalerte sonde 1 passe de HAUT a BAS\n"); // debug
+				Ecris_UART("\nLe niveau dalerte sonde 1 passe de HAUT a BAS\n\r"); // debug
 			}
 			
 			niveauAlerte1 = BAS; 		
 		}
 		
-		Ecris_UART("\nLflagpoll %d\n", flagPoll); // debug
+		Ecris_UART("\n\rLflagpoll %d\n\r", flagPoll); // debug
 	}
 	
 	// Si on ne connait pas letat de la sonde 2 il faut lui demander
@@ -351,9 +351,9 @@ static void APP_TaskHandler(void)
 	{
 		envoieMessage(niveauAlerte1, POLL); // effectue le checksum + code dentete + envoie du poll
 		
-		//Ecris_UART("\NE CONNAIT PAS LETAT DE LA SONDE 2: ON LUI DEMANDE\n"); // debug
-		Ecris_UART("\iswaitingAck1 = %d\n", isWaitingAck1); // debug
-		Ecris_UART("\iswaitingAck2 = %d\n", isWaitingAck2); // debug
+		//Ecris_UART("\NE CONNAIT PAS LETAT DE LA SONDE 2: ON LUI DEMANDE\n\r"); // debug
+		Ecris_UART("\iswaitingAck1 = %d\n\r", isWaitingAck1); // debug
+		Ecris_UART("\iswaitingAck2 = %d\n\r", isWaitingAck2); // debug
 			
 		isWaitingAck1 = 1; // on attend un ack1 de la sonde 2
 		
@@ -367,7 +367,7 @@ static void APP_TaskHandler(void)
 		
 		envoieMessage(niveauAlerte1, POLL); // effectue le checksum + code dentete + envoie du poll
 		
-		//Ecris_UART("\nCHANGEMENT DETAT SONDE 1: ON ENVOIE UN POLL\n"); // debug
+		//Ecris_UART("\n\rCHANGEMENT DETAT SONDE 1: ON ENVOIE UN POLL\n\r"); // debug
 		
 		isWaitingAck1 = true; // on attend un ack1 de la sonde 2
 	}
@@ -381,13 +381,13 @@ static void APP_TaskHandler(void)
 		
 		niveauAlerte2 = INDETERMINE; // on ne sais pas le niveau dalerte de la sonde 2
 		
-		Ecris_UART("\nLa sonde 1 na pas recu de ack de sonde 2 dans le delai prescrit\n"); // debug
+		Ecris_UART("\n\rLa sonde 1 na pas recu de ack de sonde 2 dans le delai prescrit\n\r"); // debug
 		
 		if(compteurPerteConnexion++ >= maxPerteConnexion) // si ca trop dessai et pas de nouvelle de la sonde 2
 		{
 			perteConnexion = true;
 			compteurPerteConnexion = 0;
-			Ecris_UART("\nTrop dessais de comm: on rejette letat de la sonde 2 pour linstant\n"); // debug		
+			Ecris_UART("\n\rTrop dessais de comm: on rejette letat de la sonde 2 pour linstant\n\r"); // debug		
 		}			
 	}
 	
@@ -409,7 +409,7 @@ static void APP_TaskHandler(void)
 	// si un paquet est recu sur le wireless
 	if(receivedWireless == 1)
 	{	
-		Ecris_UART("\nReception dun message wireless\n"); // debug
+		Ecris_UART("\n\rReception dun message wireless\n\r"); // debug
 		
 		if(recoieMessage(tempNiveauAlerte2, receptAckType, CRC_confirm))
 		{
@@ -438,11 +438,11 @@ static void APP_TaskHandler(void)
 				niveauAlerte2 = tempNiveauAlerte2; // on update letat dalerte de la sonde 2
 				
 				if(niveauAlerte2 == HAUT)
-					Ecris_UART("\nReception niveau alerte sonde 2: HAUT\n"); // debug
+					Ecris_UART("\n\rReception niveau alerte sonde 2: HAUT\n\r"); // debug
 				else if(niveauAlerte2 == BAS)
-					Ecris_UART("\nReception niveau alerte sonde 2: BAS\n"); // debug				
+					Ecris_UART("\n\rReception niveau alerte sonde 2: BAS\n\r"); // debug				
 				else
-					Ecris_UART("\nReception niveau alerte sonde 2: INDETERMINE\n"); // debug				
+					Ecris_UART("\n\rReception niveau alerte sonde 2: INDETERMINE\n\r"); // debug				
 				
 				envoieMessage(niveauAlerte1, ACK2); // envoie un message vide avec ack = ack2 
 				
@@ -461,11 +461,11 @@ static void APP_TaskHandler(void)
 				niveauAlerte2 = tempNiveauAlerte2; // on update letat dalerte de la sonde 2
 				
 				if(niveauAlerte2 == HAUT)
-					Ecris_UART("\nReception niveau alerte sonde 2: HAUT\n"); // debug
+					Ecris_UART("\n\rReception niveau alerte sonde 2: HAUT\n\r"); // debug
 				else if(niveauAlerte2 == BAS)
-					Ecris_UART("\nReception niveau alerte sonde 2: BAS\n"); // debug				
+					Ecris_UART("\n\rReception niveau alerte sonde 2: BAS\n\r"); // debug				
 				else
-					Ecris_UART("\nReception niveau alerte sonde 2: INDETERMINE\n"); // debug
+					Ecris_UART("\n\rReception niveau alerte sonde 2: INDETERMINE\n\r"); // debug
 									
 				isWaitingAck2 = true; // on attend de recevoir la confirmation de lautre sonde
 				
@@ -574,6 +574,21 @@ bool recoieMessage(EtatAlerte message, AckType acktype, bool CRC_confirm)
 	//////////
 	//////////
 	//////////
+	
+	/*
+	
+	sprintf(testBuffer2, "%s" , ind.data);
+	
+	AdresseCorrect = decodeMessage(&testAlerte2, testBuffer2, &ackTest2, &crcOK);
+	
+	//Ecris_UART("\n\rnew trame! size: %d, RSSI: %ddBm\n\r Data: %s\n\r", ind.size, ind.rssi, testBuffer2);
+	
+	if(AdresseCorrect)
+	{
+		Ecris_UART("\n\rnew trame! size: %d, RSSI: %ddBm\n\r alerte: %d\n\r Ack: %d\n\r CRC :%d", ind.size, ind.rssi, testAlerte2,ackTest2, crcOK);
+	}
+	
+	*/
 	// A FAIRE
 	//////////
 	//////////
@@ -588,6 +603,15 @@ void envoieMessage(EtatAlerte message, AckType acktype)
 	//////////
 	//////////
 	//////////
+	/*
+		// variables pour test
+		uint8_t testBuffer[MessageLength];
+		Alerte testAlerte = HAUT;
+		uint8_t ackTest = 2;
+		*/
+	//genMessage(testAlerte, testBuffer, ackTest);
+	//Ecris_Wireless(testBuffer, MessageLength);
+	//
 	// A FAIRE
 	//////////
 	//////////
