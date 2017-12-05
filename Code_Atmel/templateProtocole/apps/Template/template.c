@@ -335,11 +335,11 @@ static void APP_TaskHandler(void)
 				niveauAlerte2 = tempNiveauAlerte2; // on update letat dalerte de la sonde 2
 				
 				if(niveauAlerte2 == HAUT)
-				Ecris_UART("\n\rReception niveau alerte sonde 2: HAUT\n\r"); // debug
+				Ecris_UART("\n\rACK1:Reception niveau alerte sonde 2: HAUT\n\r"); // debug
 				else if(niveauAlerte2 == BAS)
-				Ecris_UART("\n\rReception niveau alerte sonde 2: BAS\n\r"); // debug
+				Ecris_UART("\n\rACK1:Reception niveau alerte sonde 2: BAS\n\r"); // debug
 				else
-				Ecris_UART("\n\rReception niveau alerte sonde 2: INDETERMINE\n\r"); // debug
+				Ecris_UART("\n\rACK1:Reception niveau alerte sonde 2: INDETERMINE\n\r"); // debug
 				
 				envoieMessage(niveauAlerte1, ACK2); // envoie un message vide avec ack = ack2
 				
@@ -358,11 +358,11 @@ static void APP_TaskHandler(void)
 				niveauAlerte2 = tempNiveauAlerte2; // on update letat dalerte de la sonde 2
 				
 				if(niveauAlerte2 == HAUT)
-				Ecris_UART("\n\rReception niveau alerte sonde 2: HAUT\n\r"); // debug
+				Ecris_UART("\n\rPOLL:Reception niveau alerte sonde 2: HAUT\n\r"); // debug
 				else if(niveauAlerte2 == BAS)
-				Ecris_UART("\n\rReception niveau alerte sonde 2: BAS\n\r"); // debug
+				Ecris_UART("\n\rPOLL:Reception niveau alerte sonde 2: BAS\n\r"); // debug
 				else
-				Ecris_UART("\n\rReception niveau alerte sonde 2: INDETERMINE\n\r"); // debug
+				Ecris_UART("\n\rPOLL:Reception niveau alerte sonde 2: INDETERMINE\n\r"); // debug
 				
 				isWaitingAck2 = true; // on attend de recevoir la confirmation de lautre sonde
 				
@@ -477,15 +477,15 @@ void ledAlerte(EtatAlerteGlobal etatalerteglobal)
 	
 	if(etatalerteglobal == ATTENTE) // allume leds vert et eteint les autres
 	{
-		intervalLEDAlerte = 8000; // toggle a chaque 1 sec
+		intervalLEDAlerte = 10000; // toggle a chaque 1 sec
 	}
 	else if(etatalerteglobal == AVERTISSEMENT) // allume leds bleu et eteint les autres
 	{
-		intervalLEDAlerte = 3000; // toggle a chaque 0.5 sec	
+		intervalLEDAlerte = 5000; // toggle a chaque 0.5 sec	
 	}
 	else if(etatalerteglobal == EMISSION) // allume leds rouge et eteint les autres
 	{
-		intervalLEDAlerte = 1000; // toggle a chaque 0.2 sec
+		intervalLEDAlerte = 3500; // toggle a chaque 0.2 sec
 	}
 	else
 	{
