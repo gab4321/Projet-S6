@@ -408,6 +408,10 @@ static void APP_TaskHandler(void)
 	// la sonde 1 et la sonde 2 ont un etat dalerte haut
 	if(!perteConnexion && niveauAlerte1 == HAUT && niveauAlerte2 == HAUT)
 	etatAlerteGlobal = EMISSION;
+	
+	// la sonde 1 et la sonde 2 ont un etat dalerte haut
+	if(!perteConnexion && niveauAlerte1 == BAS && niveauAlerte2 == HAUT)
+	etatAlerteGlobal = AVERTISSEMENT;
 
 	// la sonde 1 a une alerte haute et la sonde 2 reste a alerte basse
 	if(!perteConnexion && niveauAlerte1 == HAUT && niveauAlerte2 == BAS)
