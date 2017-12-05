@@ -735,9 +735,6 @@ void start_ADC()
 //Fonctions pour la communication
 bool genMessage(EtatAlerte alerte, char *message, AckType ack)
 {
-    
-	alerte = HAUT;
-	cunt = alerte; // POUR DEBUG//
 
 	// formatage du Id mdp
 	memcpy(message, IDCode, strlen(IDCode));
