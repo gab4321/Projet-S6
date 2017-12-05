@@ -799,8 +799,10 @@ bool recoieMessage(EtatAlerte *alerte, AckType *acktype, bool *CRC_confirm)
 	bool status = false;
 
 	uint8_t tempData[MessageLength];
-	sprintf(tempData, "%s" , ind.data);
-	if(decodeMessage(alerte, tempData, acktype, CRC_confirm))
+	//sprintf(tempData, "%s" , ind.data);
+	//memcpy(tempData, ind.data, MessageLength)
+	//if(decodeMessage(alerte, tempData, acktype, CRC_confirm))
+	if(decodeMessage(alerte, ind.data, acktype, CRC_confirm))
 	{
 		status = true;
 		
