@@ -409,7 +409,7 @@ static void APP_TaskHandler(void)
 	if(!perteConnexion && niveauAlerte1 == HAUT && niveauAlerte2 == HAUT)
 	etatAlerteGlobal = EMISSION;
 	
-	// la sonde 1 et la sonde 2 ont un etat dalerte haut
+	// la sonde 1 alerte bas et sonde 2 alerte haut
 	if(!perteConnexion && niveauAlerte1 == BAS && niveauAlerte2 == HAUT)
 	etatAlerteGlobal = AVERTISSEMENT;
 
@@ -470,15 +470,15 @@ void ledAlerte(EtatAlerteGlobal etatalerteglobal)
 	
 	if(etatalerteglobal == ATTENTE) // allume leds vert et eteint les autres
 	{
-		intervalLEDAlerte = 10000; // toggle a chaque 1 sec
+		intervalLEDAlerte = 30000; // toggle a chaque 1 sec
 	}
 	else if(etatalerteglobal == AVERTISSEMENT) // allume leds bleu et eteint les autres
 	{
-		intervalLEDAlerte = 5000; // toggle a chaque 0.5 sec	
+		intervalLEDAlerte = 7000; // toggle a chaque 0.5 sec	
 	}
 	else if(etatalerteglobal == EMISSION) // allume leds rouge et eteint les autres
 	{
-		intervalLEDAlerte = 2000; // toggle a chaque 0.2 sec
+		intervalLEDAlerte = 2500; // toggle a chaque 0.2 sec
 	}
 	else
 	{
@@ -495,27 +495,43 @@ void ledPH(float valeurPh)
 	
 	if((valeurPh <= 7.0) && (valeurPh >= 4.0)) // allume leds vert et eteint les autres
 	{
-		PORTB &= 0xBF; // (ROUGE) PORTB |= 0x40; // (ROUGE)
-		PORTB &= 0xFD; // (BLEU)  PORTB |= 0x02; // (BLEU)
-		PORTB |= 0x20; // (VERT)  PORTB &= 0xDF; // (VERT)
+		PORTB |= 0x40; // (ROUGE)
+		PORTB &= 0xFD; // (BLEU)
+		PORTB |= 0x20; // (VERT)
+		
+		//PORTB &= 0xBF; // (ROUGE)
+		//PORTB &= 0xFD; // (BLEU)
+		//PORTB |= 0x20; // (VERT)
 	}
 	else if(valeurPh > 7.0) // allume leds bleu et eteint les autres
 	{
-		PORTB &= 0xBF; // (ROUGE) PORTB |= 0x40; // (ROUGE)
-		PORTB |= 0x02; // (BLEU)  PORTB &= 0xFD; // (BLEU)
-		PORTB &= 0xDF; // (VERT)  PORTB |= 0x20; // (VERT)
+		PORTB |= 0x40; // (ROUGE)
+		PORTB |= 0x02; // (BLEU)
+		PORTB &= 0xDF; // (VERT)
+		
+		//PORTB &= 0xBF; // (ROUGE) 
+		//PORTB |= 0x02; // (BLEU) 
+		//PORTB &= 0xDF; // (VERT)  
 	}
 	else if(valeurPh < 4.0) // allume leds rouge et eteint les autres
 	{
-		PORTB |= 0x40; // (ROUGE) PORTB &= 0xBF; // (ROUGE)
-		PORTB &= 0xFD; // (BLEU)  PORTB |= 0x02; // (BLEU)
-		PORTB &= 0xDF; // (VERT)  PORTB |= 0x20; // (VERT)
+		//PORTB |= 0x40; // (ROUGE) 
+		//PORTB &= 0xFD; // (BLEU)  
+		//PORTB &= 0xDF; // (VERT) 
+		
+		PORTB &= 0xBF; // (ROUGE)
+		PORTB |= 0x02; // (BLEU)
+		PORTB |= 0x20; // (VERT)
 	}
 	else
 	{
-		PORTB &= 0xBF; // (ROUGE) PORTB |= 0x40; // (ROUGE)
-		PORTB &= 0xFD; // (BLEU)  PORTB |= 0x02; // (BLEU)
-		PORTB &= 0xDF; // (VERT)  PORTB |= 0x20; // (VERT)
+		//PORTB &= 0xBF; // (ROUGE) 
+		//PORTB &= 0xFD; // (BLEU)  
+		//PORTB &= 0xDF; // (VERT)  
+		
+		PORTB |= 0x40; // (ROUGE)
+		PORTB |= 0x02; // (BLEU)
+		PORTB |= 0x20; // (VERT)
 	}
 }
 
@@ -630,9 +646,9 @@ void LED_setup(void)
 		
 	DDRB |= 0x40; //PB6 output (rouge) (pour ph)
 		
-	DDRB |= 0x20; //PB5 output (vert) (pour ph)
+	DDRB |= 0x20; //PB5 output (bleu) (pour ph)
 		
-	DDRB |= 0x02; //PB1 output (bleu) (pour ph)
+	DDRB |= 0x02; //PB1 output (vert) (pour ph)
 	
 	DDRD |= 0x01; //PD0 output (rouge) (pour niveau alerte)
 		
