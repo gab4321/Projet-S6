@@ -727,6 +727,7 @@ void start_ADC()
 	ADCSRA |= 0b01000000;
 }
 
+
 //Fonctions pour la communication
 bool genMessage(EtatAlerte alerte, char *message, AckType ack)
 {
