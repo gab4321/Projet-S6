@@ -404,6 +404,10 @@ static void APP_TaskHandler(void)
 	// la sonde 1 et la sonde 2 ont un etat dalerte bas
 	if(!perteConnexion && niveauAlerte1 == BAS && niveauAlerte2 == BAS)
 	etatAlerteGlobal = ATTENTE;
+	
+	// la sonde 1 et la sonde 2 ont un etat dalerte haut
+	if(!perteConnexion && niveauAlerte1 == HAUT && niveauAlerte2 == HAUT)
+	etatAlerteGlobal = EMISSION;
 
 	// la sonde 1 a une alerte haute et la sonde 2 reste a alerte basse
 	if(!perteConnexion && niveauAlerte1 == HAUT && niveauAlerte2 == BAS)
@@ -420,23 +424,6 @@ static void APP_TaskHandler(void)
 		flagConfSonde1 = false;
 		isCountingAttenteSonde1 = false;
 		flagTimeOutEmission1 = false;
-	}
-
-	// la sonde 2 a une alerte haute et la sonde 1 reste a alerte basse
-	if(!perteConnexion && niveauAlerte1 == BAS && niveauAlerte2 == HAUT)
-	{
-		flagConfSonde1 = true;
-		
-		if(flagTimeOutEmission2)
-		etatAlerteGlobal = EMISSION;
-		else
-		etatAlerteGlobal = AVERTISSEMENT;
-	}
-	else
-	{
-		flagConfSonde2 = false;
-		isCountingAttenteSonde2 = false;
-		flagTimeOutEmission2 = false;
 	}
 	////////////////////////////////////////////////////////////////////////////////
 	
@@ -479,11 +466,11 @@ void ledAlerte(EtatAlerteGlobal etatalerteglobal)
 	
 	if(etatalerteglobal == ATTENTE) // allume leds vert et eteint les autres
 	{
-		intervalLEDAlerte = 10000; // toggle a chaque 1 sec
+		intervalLEDAlerte = 65000; // toggle a chaque 1 sec
 	}
 	else if(etatalerteglobal == AVERTISSEMENT) // allume leds bleu et eteint les autres
 	{
-		intervalLEDAlerte = 5000; // toggle a chaque 0.5 sec	
+		intervalLEDAlerte = 10000; // toggle a chaque 0.5 sec	
 	}
 	else if(etatalerteglobal == EMISSION) // allume leds rouge et eteint les autres
 	{
