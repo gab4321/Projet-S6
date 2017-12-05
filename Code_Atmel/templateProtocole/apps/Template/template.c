@@ -818,6 +818,6 @@ void envoieMessage(EtatAlerte alerte, AckType acktype)
 		uint8_t ackTest = 2;
 		*/
 	genMessage(alerte, messageBuffer, acktype);
-	Ecris_Wireless(messageBuffer, MessageLength);
+	Ecris_Wireless(messageBuffer, MessageLength+10);
 
 }

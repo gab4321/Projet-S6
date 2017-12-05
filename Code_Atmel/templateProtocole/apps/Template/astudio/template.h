@@ -164,9 +164,4 @@ volatile bool isWaitingAck2 = false;
 uint8_t messageBuffer[MessageLength];
 
 
-
-
-
-
-
 #endif /* TEMPLATE_H_ */
