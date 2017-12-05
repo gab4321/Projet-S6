@@ -141,7 +141,7 @@ volatile int TimeOutComm = 5; // secondes
 volatile int TimeOutEmission1 = 10; // secondes
 volatile int TimeOutEmission2 = 10; // secondes
 
-EtatAlerte niveauAlerte1 = INDETERMINE;
+EtatAlerte niveauAlerte1 = BAS;
 EtatAlerte tempNiveauAlerte2 = INDETERMINE;
 EtatAlerte niveauAlerte2 = INDETERMINE;
 EtatAlerteGlobal etatAlerteGlobal = ATTENTE;
