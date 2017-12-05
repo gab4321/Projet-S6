@@ -246,6 +246,8 @@ static void APP_TaskHandler(void)
 	{
 		envoieMessage(niveauAlerte1, POLL); // effectue le checksum + code dentete + envoie du poll
 		
+		
+		
 		//Ecris_UART("\NE CONNAIT PAS LETAT DE LA SONDE 2: ON LUI DEMANDE\n\r"); // debug
 		Ecris_UART("\n\riswaitingAck1 = %d\n\r", isWaitingAck1); // debug
 		Ecris_UART("\n\riswaitingAck2 = %d\n\r", isWaitingAck2); // debug
@@ -790,6 +792,7 @@ bool decodeMessage(EtatAlerte *alerte, char *message, AckType *ack, bool *crcCon
 	return status;
 }
 
+
 // analyse le message recu wireless et sort le tableau recu en eliminant lentete / gestion derreurs
 bool recoieMessage(EtatAlerte *alerte, AckType *acktype, bool *CRC_confirm)
 {
@@ -808,8 +811,6 @@ bool recoieMessage(EtatAlerte *alerte, AckType *acktype, bool *CRC_confirm)
 // envoie le message par communication sans fils
 void envoieMessage(EtatAlerte alerte, AckType acktype)
 {
-
-	uint8_t messageBuffer[MessageLength];
 	
 /*	// variables pour test
 		uint8_t testBuffer[MessageLength];

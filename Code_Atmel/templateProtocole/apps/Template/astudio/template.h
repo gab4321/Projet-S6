@@ -161,6 +161,8 @@ bool CRC_confirm = false;
 volatile bool isWaitingAck1 = false;
 volatile bool isWaitingAck2 = false;
 
+uint8_t messageBuffer[MessageLength];
+
 
 
 
