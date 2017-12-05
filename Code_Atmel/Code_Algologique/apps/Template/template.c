@@ -113,13 +113,14 @@ volatile uint8_t intervalAttenteAlerte = 30; // secondes
 volatile uint8_t intervalAttenteEmission = 30; // secondes
 volatile int intervalLEDAlerte = 5000;
 
+volatile bool flagToggleLED = false;
 volatile bool flagPh = false;
 volatile bool flag_ADC = false;
 volatile bool flagCancelAlerte = false;
 volatile bool flagAttenteAlerte = false;
 volatile bool flagAttenteEmission = false;
 volatile bool flagEmissionFinie = false;
-volatile bool flagPoll = false;
+bool flagPoll = false;
 volatile bool flagAttenteAck1 = false;
 volatile bool flagAttenteAck2 = false;
 volatile bool flagTimeOutAck1 = false;
@@ -130,6 +131,7 @@ volatile bool isCountingAttenteSonde1 = false;
 volatile bool isCountingAttenteSonde2 = false;
 volatile bool flagTimeOutEmission1 = false;
 volatile bool flagTimeOutEmission2 = false;
+volatile bool flagISRTimeOutComm1 = false;
 
 volatile int intervalPoll = 20; // secondes
 volatile int TimeOutComm = 5; // secondes
@@ -153,8 +155,8 @@ uint8_t maxPerteConnexion = 5;
 bool perteConnexion = false;
 bool CRC_confirm = false;
 
-bool isWaitingAck1 = false;
-bool isWaitingAck2 = false;
+volatile bool isWaitingAck1 = false;
+volatile bool isWaitingAck2 = false;
 
 ////////////////////////////////////////////////////////////////////////////////
 // INTERRUPT SERVICE ROUTINE
@@ -163,7 +165,16 @@ bool isWaitingAck2 = false;
 // ISR DU TIMER 1
 ISR(TIMER1_COMPA_vect) {
 	
-	compteur_color++; // test pour fonction de leds...
+	//compteur_color++; // test pour fonction de leds...
+	
+	
+	if(compteurLEDAlerte++ >= intervalLEDAlerte)
+	{
+		compteurLEDAlerte = 0;
+		//flagToggleLED = true;
+		LED_Toggle();
+	}
+	
 	
 	// tests leds RGB
 	//set_couleur(valeur_rouge, valeur_bleu, valeur_vert);
@@ -188,8 +199,15 @@ ISR(TIMER3_COMPA_vect) {
 	}
 	*/
 	
+	if(compteurAttenteAck1++ > TimeOutComm)
+	{
+		compteurAttenteAck1 = 0;
+		flagISRTimeOutComm1 = true;		
+	}
+	
+	
 	// compteur de timeout de la comm si ne recoit pas dacknowledge UN (1) dans les delai requis
-	if(compteurAttenteAck1++ > TimeOutComm && isWaitingAck1)
+	if(compteurAttenteAck1++ > TimeOutComm && isWaitingAck1)//&& !perteConnexion)
 	{
 		compteurAttenteAck1 = 0;
 		isWaitingAck1 = false; 
@@ -202,7 +220,7 @@ ISR(TIMER3_COMPA_vect) {
 	}
 	
 	// compteur de timeout de la comm si ne recoit pas dacknowledge DEUX (2) dans les delai requis
-	if(compteurAttenteAck2++ > TimeOutComm && isWaitingAck2)
+	if(compteurAttenteAck2++ > TimeOutComm && isWaitingAck2)// && !perteConnexion)
 	{
 		compteurAttenteAck2 = 0;
 		isWaitingAck2 = false; 
@@ -242,12 +260,6 @@ ISR(TIMER3_COMPA_vect) {
 		compteurTimeOutEmission2 = 0;
 	}
 	
-	if(compteurLEDAlerte++ >= intervalLEDAlerte)
-	{
-		compteurLEDAlerte = 0;
-		LED_Toggle();
-	}
-	
 }
 
 // ISR DE LADC
@@ -263,6 +275,13 @@ ISR(ADC_vect)
 
 static void APP_TaskHandler(void)
 {
+	// on toggle la LED
+	if(flagToggleLED)
+	{
+		flagToggleLED = false;
+		LED_Toggle();
+	}
+	
 	// Update les leds de niveau dalerte
 	ledAlerte(etatAlerteGlobal);
 	
@@ -328,21 +347,27 @@ static void APP_TaskHandler(void)
 	}
 	
 	// Si on ne connait pas letat de la sonde 2 il faut lui demander
-	if((niveauAlerte2 == INDETERMINE || niveauAlerte2 == ERROR_ALERTE) && !isWaitingAck1 && !isWaitingAck2 && !perteConnexion);
+	if((niveauAlerte2 == INDETERMINE || niveauAlerte2 == ERROR_ALERTE) && (isWaitingAck1 == 0) && (isWaitingAck2 == false) && (perteConnexion == false))
 	{
-		flagPoll = false; 
-		
 		envoieMessage(niveauAlerte1, POLL); // effectue le checksum + code dentete + envoie du poll
 		
-		isWaitingAck1 = true; // on attend un ack1 de la sonde 2
-	}
+		//Ecris_UART("\NE CONNAIT PAS LETAT DE LA SONDE 2: ON LUI DEMANDE\n"); // debug
+		Ecris_UART("\iswaitingAck1 = %d\n", isWaitingAck1); // debug
+		Ecris_UART("\iswaitingAck2 = %d\n", isWaitingAck2); // debug
+			
+		isWaitingAck1 = 1; // on attend un ack1 de la sonde 2
+		
+		flagPoll = false; 
+	}	
 	
 	// Si letat de la sonde 1 change il faut avertir lautre sonde
-	if(flagPoll && !isWaitingAck1 && !isWaitingAck2 && !perteConnexion);
+	if(flagPoll && (isWaitingAck1 == false) && (isWaitingAck2 == false) && (perteConnexion == false))
 	{
 		flagPoll = false;
 		
 		envoieMessage(niveauAlerte1, POLL); // effectue le checksum + code dentete + envoie du poll
+		
+		//Ecris_UART("\nCHANGEMENT DETAT SONDE 1: ON ENVOIE UN POLL\n"); // debug
 		
 		isWaitingAck1 = true; // on attend un ack1 de la sonde 2
 	}
@@ -580,15 +605,15 @@ void ledAlerte(EtatAlerteGlobal etatalerteglobal)
 	
 	if(etatalerteglobal == ATTENTE) // allume leds vert et eteint les autres
 	{
-		intervalLEDAlerte = 10000; // toggle a chaque 1 sec
+		intervalLEDAlerte = 8000; // toggle a chaque 1 sec
 	}
 	else if(etatalerteglobal == AVERTISSEMENT) // allume leds bleu et eteint les autres
 	{
-		intervalLEDAlerte = 5000; // toggle a chaque 0.5 sec	
+		intervalLEDAlerte = 3000; // toggle a chaque 0.5 sec	
 	}
 	else if(etatalerteglobal == EMISSION) // allume leds rouge et eteint les autres
 	{
-		intervalLEDAlerte = 2000; // toggle a chaque 0.2 sec
+		intervalLEDAlerte = 1000; // toggle a chaque 0.2 sec
 	}
 	else
 	{
