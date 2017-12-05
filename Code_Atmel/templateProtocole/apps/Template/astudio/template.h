@@ -32,7 +32,7 @@
 
 /*- Enum ------------------------------------------------------------*/
 typedef enum EtatAlerte EtatAlerte;
-enum EtatAlerte
+enum EtatAlerte 
 {
 	// niveaux dalerte
 	BAS,

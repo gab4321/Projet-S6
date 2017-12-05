@@ -49,7 +49,7 @@
 #include "astudio/template.h"
 
 
-
+EtatAlerte cunt;
 
 ////////////////////////////////////////////////////////////////////////////////
 // INTERRUPT SERVICE ROUTINE
@@ -735,19 +735,20 @@ void start_ADC()
 //Fonctions pour la communication
 bool genMessage(EtatAlerte alerte, char *message, AckType ack)
 {
-
-	alerte = HAUT; // POUR DEBUG//
+    
+	alerte = HAUT;
+	cunt = alerte; // POUR DEBUG//
 
 	// formatage du Id mdp
 	memcpy(message, IDCode, strlen(IDCode));
 
 	// formatage du ack
-	memcpy(message+strlen(IDCode), &ack, sizeof(ack));
+	memcpy(message+strlen(IDCode), &ack, sizeof((uint8_t)ack));
 	//message[strlen(IDCode)] = ack;
 	
 	
 	// formatage du message
-	memcpy(message+strlen(IDCode)+sizeof(ack), &alerte, sizeof(alerte));
+	memcpy(message+strlen(IDCode)+sizeof((uint8_t)ack), &alerte, sizeof((uint8_t)alerte));
 
 	uint8_t crcResult = crc_8((unsigned char*)message, MessageLength-1);
 
